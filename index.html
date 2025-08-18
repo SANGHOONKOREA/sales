@@ -187,67 +187,67 @@
         <div class="dashboard-grid">
           <div class="kpi-card">
             <div class="kpi-icon blue">
-              <i class="fas fa-users"></i>
+              <i class="fas fa-box"></i>
             </div>
             <div class="kpi-content">
-              <h3>총 고객수</h3>
-              <p class="kpi-value" id="totalCustomers">0</p>
-              <span class="kpi-change positive">+12% 전월 대비</span>
+              <h3>수주량</h3>
+              <p class="kpi-value" id="orderVolume">₩0</p>
+              <span class="kpi-change positive">0% 전월 대비</span>
             </div>
           </div>
-          
+
           <div class="kpi-card">
             <div class="kpi-icon green">
-              <i class="fas fa-handshake"></i>
+              <i class="fas fa-tasks"></i>
             </div>
             <div class="kpi-content">
-              <h3>진행중인 거래</h3>
-              <p class="kpi-value" id="activeDeals">0</p>
-              <span class="kpi-change positive">+5% 전월 대비</span>
+              <h3>진행중 프로젝트</h3>
+              <p class="kpi-value" id="ongoingProjects">0</p>
+              <span class="kpi-change positive">0% 전월 대비</span>
             </div>
           </div>
-          
+
           <div class="kpi-card">
             <div class="kpi-icon orange">
-              <i class="fas fa-file-invoice-dollar"></i>
+              <i class="fas fa-calendar-alt"></i>
             </div>
             <div class="kpi-content">
-              <h3>영업 안건</h3>
-              <p class="kpi-value" id="totalSalesItems">0</p>
-              <span class="kpi-change positive">+23% 전월 대비</span>
+              <h3>예정 프로젝트</h3>
+              <p class="kpi-value" id="plannedProjects">0</p>
+              <span class="kpi-change positive">0% 전월 대비</span>
             </div>
           </div>
-          
+
           <div class="kpi-card">
             <div class="kpi-icon purple">
-              <i class="fas fa-chart-line"></i>
+              <i class="fas fa-percentage"></i>
             </div>
             <div class="kpi-content">
-              <h3>전환율</h3>
-              <p class="kpi-value" id="conversionRate">0%</p>
-              <span class="kpi-change negative">-2% 전월 대비</span>
+              <h3>수주 확률</h3>
+              <p class="kpi-value" id="orderProbability">0%</p>
+              <span class="kpi-change negative">0% 전월 대비</span>
             </div>
           </div>
-          
+
           <div class="kpi-card">
             <div class="kpi-icon red">
-              <i class="fas fa-dollar-sign"></i>
+              <i class="fas fa-file-alt"></i>
             </div>
             <div class="kpi-content">
-              <h3>예상 매출</h3>
-              <p class="kpi-value" id="expectedRevenue">₩0</p>
-              <span class="kpi-change positive">+18% 전월 대비</span>
+              <h3>관리 포스트</h3>
+              <p class="kpi-value" id="managedPosts">0</p>
+              <span class="kpi-change positive">0% 전월 대비</span>
             </div>
           </div>
-          
+
           <div class="kpi-card">
             <div class="kpi-icon teal">
-              <i class="fas fa-check-circle"></i>
+              <i class="fas fa-user-tie"></i>
             </div>
             <div class="kpi-content">
-              <h3>완료 안건</h3>
-              <p class="kpi-value" id="completedSales">0</p>
-              <span class="kpi-change positive">+7% 전월 대비</span>
+              <h3>선주사</h3>
+              <p class="kpi-value" id="shipowners">0</p>
+              <span class="kpi-change positive">0% 전월 대비</span>
             </div>
           </div>
         </div>
@@ -255,20 +255,16 @@
         <!-- 차트 영역 -->
         <div class="dashboard-charts">
           <div class="chart-container">
-            <h3>월별 매출 추이</h3>
-            <canvas id="revenueChart"></canvas>
+            <h3>제품별 수주 현황</h3>
+            <canvas id="productOrderChart"></canvas>
           </div>
           <div class="chart-container">
-            <h3>파이프라인 현황</h3>
-            <canvas id="pipelineChart"></canvas>
+            <h3>월별 수주 추이</h3>
+            <canvas id="monthlyOrderChart"></canvas>
           </div>
           <div class="chart-container">
-            <h3>제품별 영업 현황</h3>
-            <canvas id="productSalesChart"></canvas>
-          </div>
-          <div class="chart-container">
-            <h3>담당자별 성과</h3>
-            <canvas id="managerPerformanceChart"></canvas>
+            <h3>조선소의 프로젝트 분포</h3>
+            <canvas id="shipyardProjectChart"></canvas>
           </div>
         </div>
 

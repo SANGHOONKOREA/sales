@@ -754,129 +754,50 @@ function initializeDashboard() {
 }
 
 // 대시보드 통계 업데이트
-// 대시보드 통계 업데이트
 function updateDashboardStats() {
-  // 총 고객수
-  document.getElementById('totalCustomers').textContent = customers.length;
-  
-  // 주요 고객수 (mainCustomer === 'Y')
-  const mainCustomers = customers.filter(c => c.mainCustomer === 'Y').length;
-  
-  // 진행중인 거래
-  const activeDeals = deals.filter(d => d.stage !== 'closed' && d.stage !== 'lost').length;
-  document.getElementById('activeDeals').textContent = activeDeals;
-  
-  // 영업 안건
-  document.getElementById('totalSalesItems').textContent = salesData.length;
-  
-  // 완료 안건
-  const completedSales = salesData.filter(s => s.progress === '계약완료').length;
-  document.getElementById('completedSales').textContent = completedSales;
-  
-  // 예상 매출 (거래 + 영업안건)
-  const dealRevenue = deals
-    .filter(d => d.stage !== 'lost')
-    .reduce((sum, d) => sum + (d.value || 0) * (d.probability || 0) / 100, 0);
-  
-  const salesRevenue = salesData
-    .filter(s => s.progress !== '실주')
+  // 수주량 (완료된 거래 및 영업안건 금액 합산)
+  const closedDealAmount = deals
+    .filter(d => d.stage === 'closed')
+    .reduce((sum, d) => sum + (d.value || 0), 0);
+  const completedSalesAmount = salesData
+    .filter(s => s.progress === '계약완료')
     .reduce((sum, s) => {
       const amount = parseFloat(String(s.bidAmount).replace(/,/g, '')) || 0;
       const multiplier = s.currency === 'USD' ? 1300 : 1;
-      return sum + (amount * multiplier);
+      return sum + amount * multiplier;
     }, 0);
-  
-  const totalExpectedRevenue = dealRevenue + salesRevenue;
-  document.getElementById('expectedRevenue').textContent = formatCurrency(totalExpectedRevenue);
-  
-  // 전환율
-  const totalOpportunities = deals.length + salesData.filter(s => s.progress).length;
-  const closedOpportunities = deals.filter(d => d.stage === 'closed').length + 
-                             salesData.filter(s => s.progress === '계약완료').length;
-  const conversionRate = totalOpportunities > 0 ? (closedOpportunities / totalOpportunities * 100).toFixed(1) : 0;
-  document.getElementById('conversionRate').textContent = conversionRate + '%';
-  
-  // KPI 카드 텍스트 업데이트 (주요고객 비율 표시)
-  const mainCustomerRate = customers.length > 0 ? (mainCustomers / customers.length * 100).toFixed(1) : 0;
-  const totalCustomersCard = document.querySelector('#totalCustomers').closest('.kpi-card');
-  if (totalCustomersCard) {
-    const changeSpan = totalCustomersCard.querySelector('.kpi-change');
-    if (changeSpan) {
-      changeSpan.textContent = `주요고객 ${mainCustomerRate}%`;
-      changeSpan.className = 'kpi-change positive';
-    }
-  }
+  const totalOrderVolume = closedDealAmount + completedSalesAmount;
+  document.getElementById('orderVolume').textContent = formatCurrency(totalOrderVolume);
+
+  // 진행중 프로젝트
+  const ongoingProjects = deals.filter(d => d.stage !== 'closed' && d.stage !== 'lost').length +
+                          salesData.filter(s => s.progress && s.progress !== '계약완료' && s.progress !== '실주').length;
+  document.getElementById('ongoingProjects').textContent = ongoingProjects;
+
+  // 예정 프로젝트
+  const plannedProjects = deals.filter(d => !d.stage || d.stage === 'lead').length +
+                          salesData.filter(s => !s.progress).length;
+  document.getElementById('plannedProjects').textContent = plannedProjects;
+
+  // 수주 확률 (평균 확률 기준)
+  const totalOpportunities = deals.length + salesData.length;
+  const probabilitySum = deals.reduce((sum, d) => sum + (d.probability || 0), 0);
+  const orderProbability = totalOpportunities > 0 ? (probabilitySum / totalOpportunities).toFixed(1) : 0;
+  document.getElementById('orderProbability').textContent = orderProbability + '%';
+
+  // 관리 포스트 (커뮤니케이션 수)
+  document.getElementById('managedPosts').textContent = communications.length;
+
+  // 선주사 (고객 수)
+  document.getElementById('shipowners').textContent = customers.length;
 }
 
 // 차트 초기화
 function initializeCharts() {
-  // 월별 매출 차트
-  const revenueCtx = document.getElementById('revenueChart').getContext('2d');
-  charts.revenue = new Chart(revenueCtx, {
-    type: 'line',
-    data: {
-      labels: getLastMonths(6),
-      datasets: [{
-        label: '매출',
-        data: getMonthlyRevenue(),
-        borderColor: '#315b8a',
-        backgroundColor: 'rgba(49, 91, 138, 0.1)',
-        tension: 0.4
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: {
-          display: false
-        }
-      },
-      scales: {
-        y: {
-          beginAtZero: true,
-          ticks: {
-            callback: function(value) {
-              return formatCurrency(value);
-            }
-          }
-        }
-      }
-    }
-  });
-  
-  // 파이프라인 현황 차트
-  const pipelineCtx = document.getElementById('pipelineChart').getContext('2d');
-  charts.pipeline = new Chart(pipelineCtx, {
-    type: 'doughnut',
-    data: {
-      labels: ['리드', '연락중', '제안서', '협상중', '성사'],
-      datasets: [{
-        data: getPipelineData(),
-        backgroundColor: [
-          '#17a2b8',
-          '#ffc107',
-          '#fd7e14',
-          '#6f42c1',
-          '#28a745'
-        ]
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: {
-          position: 'bottom'
-        }
-      }
-    }
-  });
-  
-  // 제품별 영업 현황 차트
-  const productCtx = document.getElementById('productSalesChart').getContext('2d');
-  const productData = getProductSalesData();
-  charts.productSales = new Chart(productCtx, {
+  // 제품별 수주 현황 차트
+  const productCtx = document.getElementById('productOrderChart').getContext('2d');
+  const productData = getProductOrderData();
+  charts.productOrders = new Chart(productCtx, {
     type: 'bar',
     data: {
       labels: Object.keys(productData),
@@ -896,27 +817,50 @@ function initializeCharts() {
       }
     }
   });
-  
-  // 담당자별 성과 차트
-  const managerCtx = document.getElementById('managerPerformanceChart').getContext('2d');
-  const managerData = getManagerPerformanceData();
-  charts.managerPerformance = new Chart(managerCtx, {
-    type: 'horizontalBar',
+
+  // 월별 수주 추이 차트
+  const monthlyCtx = document.getElementById('monthlyOrderChart').getContext('2d');
+  charts.monthlyOrders = new Chart(monthlyCtx, {
+    type: 'line',
     data: {
-      labels: Object.keys(managerData).slice(0, 5),
+      labels: getLastMonths(6),
       datasets: [{
-        label: '완료 건수',
-        data: Object.values(managerData).slice(0, 5),
-        backgroundColor: '#28a745'
+        label: '수주',
+        data: getMonthlyOrderData(),
+        borderColor: '#315b8a',
+        backgroundColor: 'rgba(49, 91, 138, 0.1)',
+        tension: 0.4
       }]
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false }
+      },
       scales: {
-        x: {
-          beginAtZero: true
-        }
+        y: { beginAtZero: true }
+      }
+    }
+  });
+
+  // 조선소의 프로젝트 분포 차트
+  const shipyardCtx = document.getElementById('shipyardProjectChart').getContext('2d');
+  const shipyardData = getShipyardProjectData();
+  charts.shipyardProjects = new Chart(shipyardCtx, {
+    type: 'doughnut',
+    data: {
+      labels: Object.keys(shipyardData),
+      datasets: [{
+        data: Object.values(shipyardData),
+        backgroundColor: ['#17a2b8', '#ffc107', '#fd7e14', '#6f42c1', '#28a745']
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'bottom' }
       }
     }
   });
@@ -4476,6 +4420,29 @@ function getManagerPerformanceData() {
       obj[key] = value;
       return obj;
     }, {});
+}
+
+// 대시보드 차트용 데이터 계산
+function getProductOrderData() {
+  const productData = {};
+  salesData.filter(s => s.progress === '계약완료').forEach(sale => {
+    const product = sale.product || '기타';
+    productData[product] = (productData[product] || 0) + 1;
+  });
+  return productData;
+}
+
+function getMonthlyOrderData() {
+  return getMonthlyRevenue();
+}
+
+function getShipyardProjectData() {
+  const shipyardData = {};
+  salesData.forEach(sale => {
+    const yard = sale.shipyard || '기타';
+    shipyardData[yard] = (shipyardData[yard] || 0) + 1;
+  });
+  return shipyardData;
 }
 
 function getAnalyticsPeriodLabels(period) {

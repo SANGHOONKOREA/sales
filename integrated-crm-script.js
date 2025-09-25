@@ -3006,7 +3006,7 @@ async function resolveUidByEmail(email) {
     return null;
   };
 
-  if (!mainUsersData || !Object.keys(mainUsersData).length) {
+  const refreshMainUsers = async () => {
     try {
       const snapshot = await db.ref(paths.mainUsers).once('value');
       mainUsersData = snapshot.val() || {};
@@ -3014,15 +3014,9 @@ async function resolveUidByEmail(email) {
       console.error('메인 사용자 목록 로드 오류:', error);
       mainUsersData = {};
     }
-  }
+  };
 
-  let resolved = findUid(mainUsersData);
-  if (resolved) return resolved;
-
-  resolved = findUid(userRecords);
-  if (resolved) return resolved;
-
-  if (!userMetaCache) {
+  const refreshUserMeta = async () => {
     try {
       const metaSnapshot = await db.ref(paths.userMeta).once('value');
       userMetaCache = metaSnapshot.val() || {};
@@ -3030,10 +3024,89 @@ async function resolveUidByEmail(email) {
       console.error('사용자 메타데이터 로드 오류:', error);
       userMetaCache = {};
     }
+  };
+
+  if (!mainUsersData || !Object.keys(mainUsersData).length) {
+    await refreshMainUsers();
+  }
+
+  let resolved = findUid(mainUsersData);
+  if (!resolved) {
+    await refreshMainUsers();
+    resolved = findUid(mainUsersData);
+  }
+  if (resolved) return resolved;
+
+  resolved = findUid(userRecords);
+  if (resolved) return resolved;
+
+  if (!userMetaCache || !Object.keys(userMetaCache).length) {
+    await refreshUserMeta();
   }
 
   resolved = findUid(userMetaCache);
+  if (!resolved) {
+    await refreshUserMeta();
+    resolved = findUid(userMetaCache);
+  }
+
   return resolved;
+}
+
+async function verifyEmailRegistration(email, existingUid = null) {
+  const normalized = normalizeEmail(email);
+  if (!normalized) {
+    return { registered: false, uid: null };
+  }
+
+  let resolvedUid = existingUid || null;
+
+  if (!resolvedUid) {
+    resolvedUid = await resolveUidByEmail(normalized);
+  }
+
+  if (resolvedUid) {
+    return { registered: true, uid: resolvedUid };
+  }
+
+  try {
+    const methods = await auth.fetchSignInMethodsForEmail(normalized);
+    if (Array.isArray(methods) && methods.length > 0) {
+      return { registered: true, uid: null };
+    }
+  } catch (error) {
+    if (error?.code === 'auth/invalid-email') {
+      throw error;
+    }
+    console.warn('이메일 인증 방법 조회 실패:', error);
+  }
+
+  try {
+    const response = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:createAuthUri?key=${firebaseConfig.apiKey}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        identifier: normalized,
+        continueUri: (typeof window !== 'undefined' && window?.location?.origin) || 'https://snsys.net'
+      })
+    });
+
+    const data = await response.json();
+
+    if (data?.registered) {
+      return { registered: true, uid: null };
+    }
+
+    if (data?.error) {
+      console.warn('Firebase createAuthUri 오류:', data.error);
+    }
+  } catch (error) {
+    console.error('Firebase 등록 이메일 확인 오류:', error);
+  }
+
+  return { registered: false, uid: null };
 }
 
 async function ensureDefaultAdminRecord() {
@@ -3433,32 +3506,29 @@ async function addNewUser() {
 
   const normalized = normalizeEmail(email);
   let recordKey = Object.keys(userRecords || {}).find(key => normalizeEmail(userRecords[key]?.email) === normalized) || null;
-  let resolvedUid = recordKey;
+  let resolvedUid = recordKey || null;
 
-  if (!resolvedUid) {
-    resolvedUid = await resolveUidByEmail(email);
-  }
-
-  let emailRegistered = !!resolvedUid;
-
-  if (!emailRegistered) {
-    try {
-      const methods = await auth.fetchSignInMethodsForEmail(email);
-      emailRegistered = Array.isArray(methods) && methods.length > 0;
-    } catch (error) {
-      console.error('이메일 확인 오류:', error);
-      if (error.code === 'auth/invalid-email') {
-        alert('올바른 이메일 형식을 입력해주세요.');
-      } else {
-        alert('이메일 확인 중 오류가 발생했습니다: ' + error.message);
-      }
-      return;
+  let verification;
+  try {
+    verification = await verifyEmailRegistration(email, resolvedUid);
+  } catch (error) {
+    console.error('이메일 확인 오류:', error);
+    if (error?.code === 'auth/invalid-email') {
+      alert('올바른 이메일 형식을 입력해주세요.');
+      emailInput?.focus();
+    } else {
+      alert('이메일 확인 중 오류가 발생했습니다: ' + (error?.message || '알 수 없는 오류'));
     }
+    return;
   }
 
-  if (!emailRegistered) {
+  if (!verification?.registered) {
     alert('Firebase Authentication에 등록된 이메일만 추가할 수 있습니다.');
     return;
+  }
+
+  if (verification.uid) {
+    resolvedUid = verification.uid;
   }
 
   if (!recordKey) {

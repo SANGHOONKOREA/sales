@@ -133,8 +133,8 @@
       <li class="nav-item" data-view="analytics">
         <a href="#"><i class="fas fa-chart-bar"></i> <span>분석 및 리포트</span></a>
       </li>
-      <li class="nav-item" data-view="settings">
-        <a href="#"><i class="fas fa-cog"></i> <span>설정</span></a>
+      <li class="nav-item" data-view="userManagement" id="navUserManagement" style="display:none;">
+        <a href="#"><i class="fas fa-user-shield"></i> <span>사용자 관리</span></a>
       </li>
     </ul>
     
@@ -291,17 +291,34 @@
               <i class="fas fa-file-export"></i> 내보내기
             </button>
           </div>
-          <div class="view-filters">
+          <div class="customer-filter-bar">
             <div class="search-box">
               <i class="fas fa-search"></i>
-              <input type="text" id="customerSearch" placeholder="고객 검색..." oninput="searchCustomers()">
+              <input type="text" id="customerSearch" placeholder="고객 검색..." oninput="applyCustomerFilters()">
             </div>
-            <select id="customerFilter" onchange="filterCustomers()">
-              <option value="">전체 고객</option>
-              <option value="vip">VIP 고객</option>
-              <option value="active">활성 고객</option>
-              <option value="inactive">비활성 고객</option>
-            </select>
+            <div class="filter-group">
+              <label for="companyFilter">회사명</label>
+              <input type="text" id="companyFilter" list="companyOptions" placeholder="회사명 선택 또는 입력" oninput="applyCustomerFilters()">
+              <datalist id="companyOptions"></datalist>
+            </div>
+            <div class="filter-group">
+              <label for="managerFilter">담당자</label>
+              <input type="text" id="managerFilter" list="managerOptions" placeholder="담당자 선택 또는 입력" oninput="applyCustomerFilters()">
+              <datalist id="managerOptions"></datalist>
+            </div>
+            <div class="filter-group">
+              <label for="mainCustomerFilter">주요고객</label>
+              <input type="text" id="mainCustomerFilter" list="mainCustomerOptions" placeholder="Y / N" oninput="applyCustomerFilters()">
+              <datalist id="mainCustomerOptions">
+                <option value="Y"></option>
+                <option value="N"></option>
+              </datalist>
+            </div>
+            <div class="filter-group">
+              <label for="emailFilter">이메일</label>
+              <input type="text" id="emailFilter" list="emailOptions" placeholder="이메일 선택 또는 입력" oninput="applyCustomerFilters()">
+              <datalist id="emailOptions"></datalist>
+            </div>
           </div>
         </div>
 
@@ -312,7 +329,7 @@
     <thead>
       <tr>
         <th><input type="checkbox" id="selectAllCustomers"></th>
-        <th>NO. <i class="fas fa-sort"></i></th>
+        <th class="col-no">NO. <i class="fas fa-sort"></i></th>
         <th>회사명 <i class="fas fa-sort"></i></th>
         <th>담당자 <i class="fas fa-sort"></i></th>
         <th>지역 <i class="fas fa-sort"></i></th>
@@ -320,8 +337,10 @@
         <th>전화2 <i class="fas fa-sort"></i></th>
         <th>이메일 <i class="fas fa-sort"></i></th>
         <th>주요고객 <i class="fas fa-sort"></i></th>
+        <th>등록자 <i class="fas fa-sort"></i></th>
         <th>등록일 <i class="fas fa-sort"></i></th>
-        <th>액션</th>
+        <th>비고 <i class="fas fa-sort"></i></th>
+        <th>편집</th>
       </tr>
     </thead>
     <tbody id="customerTableBody">
@@ -648,66 +667,60 @@
         </div>
       </div>
 
-      <!-- 설정 뷰 -->
-      <div id="settingsView" class="view-content">
-        <div class="settings-tabs">
-          <button class="tab-btn active" onclick="showSettingsTab('profile')">프로필</button>
-          <button class="tab-btn" onclick="showSettingsTab('team')">팀 관리</button>
-          <button class="tab-btn" onclick="showSettingsTab('pipeline')">파이프라인 설정</button>
-          <button class="tab-btn" onclick="showSettingsTab('integration')">연동 설정</button>
-        </div>
-
-        <div class="settings-admin-actions" id="settingsAdminActions">
-          <button id="userManageBtn" class="primary-btn">
-            <i class="fas fa-user-cog"></i> 사용자 관리
-          </button>
-        </div>
-        
-        <div class="settings-content">
-          <div id="profileSettings" class="settings-panel active">
-            <h3>프로필 설정</h3>
-            <div class="form-group">
-              <label>이름</label>
-              <input type="text" id="profileName">
-            </div>
-            <div class="form-group">
-              <label>이메일</label>
-              <input type="email" id="profileEmail" readonly>
-            </div>
-            <div class="form-group">
-              <label>부서</label>
-              <input type="text" id="profileDept">
-            </div>
-            <button class="primary-btn" onclick="saveProfile()">저장</button>
+      <!-- 사용자 관리 뷰 -->
+      <div id="userManagementView" class="view-content">
+        <div class="user-management-page">
+          <div class="user-management-header">
+            <h2><i class="fas fa-user-shield"></i> 사용자 관리</h2>
+            <p>통합 CRM Pro의 계정과 권한을 관리합니다. 이 메뉴는 관리자만 접근할 수 있습니다.</p>
           </div>
-          
-          <div id="teamSettings" class="settings-panel">
-            <h3>팀 관리</h3>
-            <button class="primary-btn mb-3" onclick="inviteTeamMember()">
-              <i class="fas fa-user-plus"></i> 팀원 초대
-            </button>
-            <div id="teamList">
-              <!-- 팀원 목록 -->
+          <div class="user-management-panel">
+            <div class="user-table-wrapper">
+              <table class="user-table">
+                <thead>
+                  <tr>
+                    <th>선택</th>
+                    <th>이메일</th>
+                    <th>이름</th>
+                    <th>부서</th>
+                    <th>권한</th>
+                  </tr>
+                </thead>
+                <tbody id="userTableBody"></tbody>
+              </table>
             </div>
-          </div>
-          
-          <div id="pipelineSettings" class="settings-panel">
-            <h3>파이프라인 설정</h3>
-            <div id="pipelineStages">
-              <!-- 파이프라인 단계 설정 -->
+            <div class="btn-row user-table-actions">
+              <button id="deleteSelectedUsersBtn" class="danger-btn">선택 사용자 삭제</button>
+              <button id="saveUserChangesBtn" class="primary-btn">변경사항 저장</button>
             </div>
-          </div>
-          
-          <div id="integrationSettings" class="settings-panel">
-            <h3>연동 설정</h3>
-            <div class="integration-list">
-              <div class="integration-item">
-                <img src="https://www.google.com/favicon.ico" alt="Google">
-                <div>
-                  <h4>Google Calendar</h4>
-                  <p>캘린더 일정을 동기화합니다</p>
+            <div class="user-management-divider"></div>
+            <div class="user-management-add">
+              <h3>사용자 추가</h3>
+              <p class="user-modal-guide">Firebase Authentication에 등록된 이메일만 추가할 수 있습니다.</p>
+              <div class="user-form-grid">
+                <div class="form-group">
+                  <label>이메일</label>
+                  <input type="email" id="newUserEmail" placeholder="name@example.com">
                 </div>
-                <button class="toggle-btn" onclick="toggleIntegration('google')">연결</button>
+                <div class="form-group">
+                  <label>이름</label>
+                  <input type="text" id="newUserName" placeholder="홍길동">
+                </div>
+                <div class="form-group">
+                  <label>부서</label>
+                  <input type="text" id="newUserDepartment" placeholder="영업팀">
+                </div>
+                <div class="form-group">
+                  <label>권한</label>
+                  <select id="newUserRole">
+                    <option value="user">일반</option>
+                    <option value="manager">매니저</option>
+                    <option value="admin">관리자</option>
+                  </select>
+                </div>
+              </div>
+              <div class="btn-row user-form-actions">
+                <button id="addUserConfirmBtn" class="primary-btn">추가</button>
               </div>
             </div>
           </div>
@@ -907,59 +920,6 @@
   </div>
 </div>
 
-<!-- 사용자 관리 모달 -->
-<div id="userModal" class="modal">
-  <div class="modal-content user-modal">
-    <span class="close" onclick="closeUserModal()">&times;</span>
-    <h2>사용자 관리</h2>
-    <div class="user-table-wrapper">
-      <table class="user-table">
-        <thead>
-          <tr>
-            <th>선택</th>
-            <th>이메일</th>
-            <th>이름</th>
-            <th>부서</th>
-            <th>권한</th>
-          </tr>
-        </thead>
-        <tbody id="userTableBody"></tbody>
-      </table>
-    </div>
-    <div class="btn-row user-table-actions">
-      <button id="deleteSelectedUsersBtn" class="danger-btn">선택 사용자 삭제</button>
-      <button id="saveUserChangesBtn" class="primary-btn">변경사항 저장</button>
-    </div>
-    <hr style="margin:15px 0;">
-    <h3>사용자 추가</h3>
-    <p class="user-modal-guide">Firebase Authentication에 등록된 이메일만 추가할 수 있습니다.</p>
-    <div class="form-group">
-      <label>이메일</label>
-      <input type="email" id="newUserEmail" placeholder="name@example.com">
-    </div>
-    <div class="form-group">
-      <label>이름</label>
-      <input type="text" id="newUserName" placeholder="홍길동">
-    </div>
-    <div class="form-group">
-      <label>부서</label>
-      <input type="text" id="newUserDepartment" placeholder="영업팀">
-    </div>
-    <div class="form-group">
-      <label>권한</label>
-      <select id="newUserRole">
-        <option value="user">일반</option>
-        <option value="manager">매니저</option>
-        <option value="admin">관리자</option>
-      </select>
-    </div>
-    <div class="btn-row">
-      <button id="addUserConfirmBtn" class="primary-btn">추가</button>
-      <button onclick="closeUserModal()" class="secondary-btn">닫기</button>
-    </div>
-  </div>
-</div>
-
 <!-- 엑셀 업로드 모달 -->
 <div id="excelModal" class="modal">
   <div class="modal-content">
@@ -968,6 +928,19 @@
       <button id="excelReplaceBtn">기존 삭제 후 업로드</button>
       <button id="excelAppendBtn">추가만</button>
       <button id="excelCancelBtn">취소</button>
+    </div>
+  </div>
+</div>
+
+<!-- 고객 가져오기 모달 -->
+<div id="customerImportModal" class="modal">
+  <div class="modal-content">
+    <h3>가져오기 방식 선택</h3>
+    <p class="modal-description">전체 업로드를 선택하면 기존 고객 데이터가 모두 대체됩니다.</p>
+    <div class="btn-row">
+      <button id="customerImportFullBtn" class="danger-btn">전체 업로드</button>
+      <button id="customerImportPartialBtn" class="primary-btn">부분 업로드</button>
+      <button id="customerImportCancelBtn" class="secondary-btn">취소</button>
     </div>
   </div>
 </div>

@@ -43,7 +43,7 @@ body {
   line-height: 1.5;
   color: var(--text-color);
   background-color: var(--background-color);
-  overflow: hidden;
+  overflow: auto;
 }
 
 /* 유틸리티 클래스 */
@@ -431,7 +431,7 @@ button {
   flex: 1;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow: auto;
   background-color: var(--background-color);
 }
 
@@ -730,10 +730,28 @@ button {
   gap: 0.75rem;
 }
 
-.view-filters {
+.customer-filter-bar {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
+  flex-wrap: wrap;
   gap: 0.75rem;
+}
+
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 160px;
+}
+
+.filter-group label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.filter-group input {
+  min-height: 38px;
 }
 
 .search-box {
@@ -750,7 +768,7 @@ button {
 
 .search-box input {
   padding-left: 2.5rem;
-  width: 250px;
+  min-width: 220px;
 }
 
 /* 데이터 테이블 */
@@ -1690,6 +1708,17 @@ th[data-field="modifiedDate"], td[data-field="modifiedDate"] { min-width: 120px;
   border-bottom: 2px solid var(--border-color);
 }
 
+.data-table th.col-no,
+.data-table td.col-no {
+  width: 80px;
+  min-width: 80px;
+  text-align: center;
+}
+
+.data-table td.main-customer-cell {
+  text-align: center;
+}
+
 .settings-admin-actions {
   display: none;
   justify-content: flex-end;
@@ -1829,6 +1858,13 @@ th[data-field="modifiedDate"], td[data-field="modifiedDate"] { min-width: 120px;
   overflow-y: auto;
 }
 
+.modal-description {
+  margin-top: -0.5rem;
+  margin-bottom: 1.25rem;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
 .modal-content.modal-lg {
   max-width: 800px;
 }
@@ -1936,44 +1972,49 @@ th[data-field="modifiedDate"], td[data-field="modifiedDate"] { min-width: 120px;
   transform: translateX(4px);
 }
 
-/* 사용자 관리 모달 */
-#userModal .modal-content.user-modal {
-  width: 720px;
-  max-width: 95%;
-  padding: 32px;
+/* 사용자 관리 */
+.user-management-page {
+  background: #fff;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
 }
 
-#userModal h2,
-#userModal h3 {
-  margin: 0 0 16px;
+.user-management-header h2 {
+  margin-bottom: 0.5rem;
   color: var(--primary-color);
-  font-weight: 600;
+  font-size: 1.4rem;
 }
 
-#userModal h2 {
-  font-size: 1.4em;
+.user-management-header p {
+  color: var(--text-muted);
+  font-size: 0.95rem;
 }
 
-#userModal h3 {
-  font-size: 1.2em;
-  margin-top: 24px;
+.user-management-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
 }
 
-#userModal .form-group {
-  margin-bottom: 16px;
+#userManagementView .form-group {
+  margin-bottom: 0;
 }
 
-#userModal .form-group label {
+#userManagementView .form-group label {
   display: block;
   font-weight: 600;
   margin-bottom: 6px;
   color: #333;
 }
 
-#userModal input[type="text"],
-#userModal input[type="password"],
-#userModal input[type="email"],
-#userModal select {
+#userManagementView input[type="text"],
+#userManagementView input[type="password"],
+#userManagementView input[type="email"],
+#userManagementView select {
   width: 100%;
   padding: 10px 12px;
   border: 1px solid #dce1e6;
@@ -1983,22 +2024,26 @@ th[data-field="modifiedDate"], td[data-field="modifiedDate"] { min-width: 120px;
   background-color: #fff;
 }
 
-#userModal input:focus,
-#userModal select:focus {
+#userManagementView input:focus,
+#userManagementView select:focus {
   border-color: var(--primary-color);
   box-shadow: 0 0 0 3px rgba(49, 91, 138, 0.1);
   outline: none;
 }
 
-#userModal .btn-row {
-  display: flex;
-  gap: 12px;
-  justify-content: flex-end;
-  margin-top: 18px;
+.user-management-divider {
+  height: 1px;
+  background: #e9ecef;
 }
 
-#userModal .btn-row button {
-  min-width: 120px;
+.user-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.user-form-actions {
+  justify-content: flex-end;
 }
 
 .user-modal-guide {

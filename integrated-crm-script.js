@@ -370,6 +370,35 @@ function updateAdminButtonsVisibility() {
   }
 }
 
+async function deleteCommunication(commId) {
+  const comm = communications.find(c => c.id === commId);
+  if (!comm) return;
+
+  const customerName = getCustomerNameById(comm.customerId) || '고객';
+  const timestamp = formatDateTime(comm.createdAt) || '';
+  const label = timestamp ? `${timestamp} 기록` : '커뮤니케이션 기록';
+  if (!confirm(`${customerName}의 ${label}을(를) 삭제하시겠습니까?`)) {
+    return;
+  }
+
+  try {
+    showLoading();
+    await db.ref(`${paths.communications}/${commId}`).remove();
+    communications = communications.filter(c => c.id !== commId);
+    loadCommCustomerList();
+    if (selectedCustomerId === comm.customerId) {
+      loadCustomerComms(selectedCustomerId);
+    }
+    logActivity('comm_deleted', `${customerName} 커뮤니케이션 삭제`);
+    showNotification('커뮤니케이션 기록이 삭제되었습니다.', 'success');
+  } catch (error) {
+    console.error('커뮤니케이션 삭제 오류:', error);
+    showNotification('기록 삭제에 실패했습니다.', 'error');
+  } finally {
+    hideLoading();
+  }
+}
+
 function normalizeMainCustomerFlag(value) {
   return (value || 'N').toString().trim().toUpperCase() === 'Y' ? 'Y' : 'N';
 }
@@ -381,11 +410,22 @@ function normalizeCustomerRecord(customer) {
   if (!normalized.registrant) {
     normalized.registrant = normalized.createdBy || '';
   }
+  if (!normalized.registrantName) {
+    normalized.registrantName = normalized.createdByName || '';
+  }
+  if (!Array.isArray(normalized.remarkHistory)) {
+    if (normalized.remarkHistory && typeof normalized.remarkHistory === 'object') {
+      normalized.remarkHistory = Object.values(normalized.remarkHistory);
+    } else {
+      normalized.remarkHistory = [];
+    }
+  }
   return normalized;
 }
 
 function getCustomerRegistrantValue(customer) {
   if (!customer) return '';
+  if (customer.registrantName) return customer.registrantName;
   return (customer.registrant || customer.createdBy || '').trim();
 }
 
@@ -408,6 +448,46 @@ function getCustomerRegistrantDisplay(customer) {
   if (!registrant) return '';
   const display = getDisplayNameByEmail(registrant);
   return display || registrant;
+}
+
+function formatUserDisplay(email) {
+  if (!email) return '';
+  const display = getDisplayNameByEmail(email);
+  if (display && display !== email) {
+    return display;
+  }
+  const [prefix] = email.split('@');
+  return prefix || email;
+}
+
+function getCustomerDisplayName(customer) {
+  if (!customer) return '';
+  return (customer.company || customer.name || customer.customerName || '').toString().trim();
+}
+
+function getCustomerNameById(customerId) {
+  if (!customerId) return '';
+  const customer = customers.find(c => c.id === customerId);
+  return getCustomerDisplayName(customer);
+}
+
+function formatEventTime(start) {
+  if (!start) return '';
+  const date = new Date(start);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleTimeString('ko-KR', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  });
+}
+
+function getEventCalendarTitle(event) {
+  if (!event) return '';
+  const author = formatUserDisplay(event.createdBy || event.modifiedBy || '');
+  const time = formatEventTime(event.start);
+  const summary = event.title || '';
+  return [author, time, summary].filter(Boolean).join(' ');
 }
 
 // 로그인 인터페이스 표시
@@ -734,9 +814,24 @@ async function loadAllData() {
     
     customers = Object.entries(customersSnap.val() || {})
       .map(([id, data]) => normalizeCustomerRecord({id, ...data}));
-    deals = Object.entries(dealsSnap.val() || {}).map(([id, data]) => ({id, ...data}));
+    deals = Object.entries(dealsSnap.val() || {}).map(([id, data]) => {
+      const deal = {id, ...data};
+      if (!deal.customerName && deal.customerId) {
+        deal.customerName = getCustomerNameById(deal.customerId);
+      }
+      if (!deal.assignedTo) {
+        deal.assignedTo = deal.createdBy || currentUser?.email || '';
+      }
+      return deal;
+    });
     communications = Object.entries(commsSnap.val() || {}).map(([id, data]) => ({id, ...data}));
-    events = Object.entries(eventsSnap.val() || {}).map(([id, data]) => ({id, ...data}));
+    events = Object.entries(eventsSnap.val() || {}).map(([id, data]) => {
+      const event = {id, ...data};
+      if (!event.customerName && event.customerId) {
+        event.customerName = getCustomerNameById(event.customerId);
+      }
+      return event;
+    });
     
     // 영업 데이터 처리
     const salesVal = salesSnap.val() || {};
@@ -817,13 +912,86 @@ function setupRealtimeListeners() {
   
   // 거래 데이터 실시간 업데이트
   db.ref(paths.deals).on('value', (snapshot) => {
-    deals = Object.entries(snapshot.val() || {}).map(([id, data]) => ({id, ...data}));
+    deals = Object.entries(snapshot.val() || {}).map(([id, data]) => {
+      const deal = {id, ...data};
+      if (!deal.customerName && deal.customerId) {
+        deal.customerName = getCustomerNameById(deal.customerId);
+      }
+      if (!deal.assignedTo) {
+        deal.assignedTo = deal.createdBy || currentUser?.email || '';
+      }
+      return deal;
+    });
     if (currentView === 'pipeline') {
       updatePipelineView();
     }
     updateDashboardStats();
   });
-  
+
+  db.ref(paths.communications).on('child_added', (snapshot) => {
+    const comm = {id: snapshot.key, ...snapshot.val()};
+    if (!communications.find(c => c.id === comm.id)) {
+      communications.push(comm);
+      loadCommCustomerList();
+      if (selectedCustomerId === comm.customerId) {
+        loadCustomerComms(selectedCustomerId);
+      }
+    }
+  });
+
+  db.ref(paths.communications).on('child_changed', (snapshot) => {
+    const index = communications.findIndex(c => c.id === snapshot.key);
+    if (index !== -1) {
+      communications[index] = {id: snapshot.key, ...snapshot.val()};
+      if (selectedCustomerId === communications[index].customerId) {
+        loadCustomerComms(selectedCustomerId);
+      }
+      loadCommCustomerList();
+    }
+  });
+
+  db.ref(paths.communications).on('child_removed', (snapshot) => {
+    communications = communications.filter(c => c.id !== snapshot.key);
+    loadCommCustomerList();
+    if (selectedCustomerId) {
+      loadCustomerComms(selectedCustomerId);
+    }
+  });
+
+  db.ref(paths.events).on('child_added', (snapshot) => {
+    const event = {id: snapshot.key, ...snapshot.val()};
+    if (!events.find(e => e.id === event.id)) {
+      if (!event.customerName && event.customerId) {
+        event.customerName = getCustomerNameById(event.customerId);
+      }
+      events.push(event);
+      if (currentView === 'calendar') {
+        initializeCalendar();
+      }
+    }
+  });
+
+  db.ref(paths.events).on('child_changed', (snapshot) => {
+    const index = events.findIndex(e => e.id === snapshot.key);
+    if (index !== -1) {
+      const updated = {id: snapshot.key, ...snapshot.val()};
+      if (!updated.customerName && updated.customerId) {
+        updated.customerName = getCustomerNameById(updated.customerId);
+      }
+      events[index] = updated;
+      if (currentView === 'calendar') {
+        initializeCalendar();
+      }
+    }
+  });
+
+  db.ref(paths.events).on('child_removed', (snapshot) => {
+    events = events.filter(e => e.id !== snapshot.key);
+    if (currentView === 'calendar') {
+      initializeCalendar();
+    }
+  });
+
   // 영업 데이터 실시간 업데이트
   db.ref(paths.salesData).on('value', (snapshot) => {
     const val = snapshot.val() || {};
@@ -1038,6 +1206,7 @@ function renderCustomerRow(tr, customer) {
   const registrantDisplay = getCustomerRegistrantDisplay(normalized);
   const registrantValue = registrantDisplay || getCustomerRegistrantValue(normalized) || '-';
   const remarkText = normalized.remark || '';
+  const historyCount = (normalized.remarkHistory || []).length;
 
   tr.dataset.customerId = normalized.id;
   tr.dataset.company = (normalized.company || '').toLowerCase();
@@ -1059,6 +1228,11 @@ function renderCustomerRow(tr, customer) {
     <td>${normalized.registDate ? formatDate(normalized.registDate) : '-'}</td>
     <td>${remarkText || '-'}</td>
     <td>
+      <button class="history-btn" onclick="viewRemarkHistory('${normalized.id}')">
+        조회 (${historyCount})
+      </button>
+    </td>
+    <td>
       <div class="action-buttons">
         <button class="btn-icon" onclick="editCustomer('${normalized.id}')" title="수정">
           <i class="fas fa-edit"></i>
@@ -1077,6 +1251,53 @@ function removeCustomerFromTable(customerId) {
     tr.remove();
     refreshCustomerFilters();
   }
+}
+
+function viewRemarkHistory(customerId) {
+  const customer = customers.find(c => c.id === customerId);
+  if (!customer) {
+    showNotification('고객 정보를 찾을 수 없습니다.', 'error');
+    return;
+  }
+
+  const history = [...(customer.remarkHistory || [])]
+    .map(entry => {
+      if (!entry) return null;
+      if (typeof entry === 'string') {
+        return { value: entry };
+      }
+      if (typeof entry === 'object') {
+        return entry;
+      }
+      return null;
+    })
+    .filter(Boolean);
+
+  if (history.length === 0) {
+    showContentModal('<p>등록된 히스토리가 없습니다.</p>', '비고 히스토리');
+    return;
+  }
+
+  history.sort((a, b) => {
+    const dateA = new Date(a.timestamp || a.modifiedAt || a.createdAt || 0);
+    const dateB = new Date(b.timestamp || b.modifiedAt || b.createdAt || 0);
+    return dateB - dateA;
+  });
+
+  const listItems = history.map(entry => {
+    const timestampValue = entry.timestamp || entry.modifiedAt || entry.createdAt;
+    const timestamp = timestampValue ? formatDateTime(timestampValue) : '-';
+    const author = formatUserDisplay(entry.modifiedBy || entry.createdBy || entry.author || entry.authorName || '');
+    const content = (entry.value ?? entry.remark ?? '').toString();
+    return `
+      <li class="remark-history-item">
+        <div class="remark-history-meta">${timestamp}${author ? ` • ${author}` : ''}</div>
+        <div>${content || '(비어 있음)'}</div>
+      </li>
+    `;
+  }).join('');
+
+  showContentModal(`<ul class="remark-history-list">${listItems}</ul>`, '비고 히스토리');
 }
 
 function refreshCustomerFilters() {
@@ -1212,9 +1433,21 @@ async function saveCustomer() {
     registDate: parseDate(document.getElementById('custRegistDate').value),
     remark: document.getElementById('custRemark').value.trim(),
     registrant,
+    registrantName: formatUserDisplay(registrant),
     modifiedDate: new Date().toISOString().split('T')[0],
     modifiedBy: currentUser.email
   };
+
+  const remarkHistory = existingCustomer?.remarkHistory ? [...existingCustomer.remarkHistory] : [];
+  const previousRemark = (existingCustomer?.remark || '').trim();
+  if (customerData.remark !== previousRemark) {
+    remarkHistory.push({
+      timestamp: new Date().toISOString(),
+      value: customerData.remark,
+      modifiedBy: currentUser.email
+    });
+  }
+  customerData.remarkHistory = remarkHistory;
 
   if (!customerData.no || !customerData.company) {
     alert('NO.와 회사명은 필수 입력 항목입니다.');
@@ -1232,8 +1465,9 @@ async function saveCustomer() {
       // 신규
       customerData.createdAt = new Date().toISOString();
       customerData.createdBy = registrant;
+      customerData.createdByName = formatUserDisplay(registrant);
 
-      const newRef = await db.ref(paths.customers).push(customerData);
+      await db.ref(paths.customers).push(customerData);
       logActivity('customer_created', `새 고객 등록: ${customerData.company}`);
     }
     
@@ -1291,7 +1525,8 @@ async function deleteCustomer(customerId) {
   const customer = customers.find(c => c.id === customerId);
   if (!customer) return;
   
-  if (confirm(`${customer.name} 고객을 삭제하시겠습니까?\n관련된 모든 데이터가 함께 삭제됩니다.`)) {
+  const customerName = getCustomerDisplayName(customer);
+  if (confirm(`${customerName} 고객을 삭제하시겠습니까?\n관련된 모든 데이터가 함께 삭제됩니다.`)) {
     try {
       showLoading();
       
@@ -1318,7 +1553,7 @@ async function deleteCustomer(customerId) {
       
       await Promise.all(batch);
       
-      logActivity('customer_deleted', `고객 삭제: ${customer.name}`);
+      logActivity('customer_deleted', `고객 삭제: ${customerName}`);
       showNotification('고객이 삭제되었습니다.', 'success');
     } catch (error) {
       console.error('고객 삭제 오류:', error);
@@ -1396,7 +1631,7 @@ async function exportCustomers() {
   try {
     showLoading();
 
-    const headers = ['NO.', '회사명', '담당자', '지역', '전화1', '전화2', '이메일', '주요고객', '등록자', '등록일', '비고', '주소', 'DATE', '수정일'];
+    const headers = ['NO.', '회사명', '담당자', '지역', '전화1', '전화2', '이메일', '주요고객', '등록자', '등록일', '비고', '비고 히스토리', '주소', 'DATE', '수정일'];
 
     const data = customers.map(customer => {
       const normalized = normalizeCustomerRecord(customer);
@@ -1412,6 +1647,7 @@ async function exportCustomers() {
         '등록자': getCustomerRegistrantValue(normalized),
         '등록일': normalized.registDate ? formatDate(normalized.registDate) : '',
         '비고': normalized.remark || '',
+        '비고 히스토리': (normalized.remarkHistory || []).length,
         '주소': normalized.address || '',
         'DATE': normalized.date ? formatDate(normalized.date) : '',
         '수정일': normalized.modifiedDate ? formatDate(normalized.modifiedDate) : ''
@@ -3772,8 +4008,9 @@ function createDealCard(deal) {
   card.dataset.dealId = deal.id;
   
   const customer = customers.find(c => c.id === deal.customerId);
-  const customerName = customer ? customer.name : '알 수 없음';
-  
+  const customerName = deal.customerId ? (getCustomerDisplayName(customer) || '알 수 없음') : (deal.customCustomer || deal.customerName || '알 수 없음');
+  const ownerName = formatUserDisplay(deal.assignedTo || deal.createdBy || deal.modifiedBy || '');
+
   card.innerHTML = `
     <div class="deal-header">
       <h4>${deal.name}</h4>
@@ -3792,6 +4029,7 @@ function createDealCard(deal) {
       <span class="deal-probability">${deal.probability || 0}%</span>
       <span class="deal-date">${formatDate(deal.closeDate)}</span>
     </div>
+    <div class="deal-owner"><i class="fas fa-user"></i> ${ownerName || '담당자 미지정'}</div>
   `;
   
   card.ondragstart = (e) => {
@@ -3815,7 +4053,7 @@ function loadPipelineFilters() {
   managers.forEach(manager => {
     const option = document.createElement('option');
     option.value = manager;
-    option.textContent = manager;
+    option.textContent = formatUserDisplay(manager);
     managerFilter.appendChild(option);
   });
 }
@@ -3872,16 +4110,24 @@ function openDealModal(dealId = null) {
   customers.forEach(customer => {
     const option = document.createElement('option');
     option.value = customer.id;
-    option.textContent = customer.name;
+    option.textContent = getCustomerDisplayName(customer);
     customerSelect.appendChild(option);
   });
-  
+
+  const manualInput = document.getElementById('dealCustomerManual');
+  if (manualInput) {
+    manualInput.value = '';
+  }
+
   if (dealId) {
     title.textContent = '거래 수정';
     const deal = deals.find(d => d.id === dealId);
     if (deal) {
       document.getElementById('dealName').value = deal.name || '';
       document.getElementById('dealCustomer').value = deal.customerId || '';
+      if (manualInput && !deal.customerId) {
+        manualInput.value = deal.customCustomer || deal.customerName || '';
+      }
       document.getElementById('dealValue').value = deal.value || '';
       document.getElementById('dealCloseDate').value = deal.closeDate || '';
       document.getElementById('dealStage').value = deal.stage || 'lead';
@@ -3911,35 +4157,50 @@ function closeDealModal() {
 async function saveDeal() {
   const modal = document.getElementById('dealModal');
   const dealId = modal.dataset.dealId;
-  
+
+  const selectedCustomerId = document.getElementById('dealCustomer').value;
+  const manualCustomerName = document.getElementById('dealCustomerManual')?.value.trim() || '';
+
+  if (!selectedCustomerId && !manualCustomerName) {
+    alert('고객을 선택하거나 직접 입력해주세요.');
+    return;
+  }
+
+  const existingDeal = dealId ? deals.find(d => d.id === dealId) : null;
+  const assignedOwner = existingDeal?.assignedTo || currentUser.email;
+  const resolvedCustomerName = selectedCustomerId ? getCustomerNameById(selectedCustomerId) : manualCustomerName;
+
   const dealData = {
     name: document.getElementById('dealName').value.trim(),
-    customerId: document.getElementById('dealCustomer').value,
+    customerId: selectedCustomerId,
     value: parseFloat(document.getElementById('dealValue').value) || 0,
     closeDate: document.getElementById('dealCloseDate').value,
     stage: document.getElementById('dealStage').value,
     probability: parseInt(document.getElementById('dealProbability').value) || 0,
     description: document.getElementById('dealDescription').value.trim(),
     modifiedAt: new Date().toISOString(),
-    modifiedBy: currentUser.email
+    modifiedBy: currentUser.email,
+    customCustomer: selectedCustomerId ? '' : manualCustomerName,
+    customerName: resolvedCustomerName,
+    assignedTo: assignedOwner
   };
-  
-  if (!dealData.name || !dealData.customerId) {
-    alert('거래명과 고객은 필수 입력 항목입니다.');
+
+  if (!dealData.name) {
+    alert('거래명은 필수 입력 항목입니다.');
     return;
   }
-  
+
   try {
     showLoading();
-    
+
     if (dealId) {
       await db.ref(`${paths.deals}/${dealId}`).update(dealData);
       logActivity('deal_updated', `거래 수정: ${dealData.name}`);
     } else {
       dealData.createdAt = new Date().toISOString();
       dealData.createdBy = currentUser.email;
-      dealData.assignedTo = currentUser.email;
-      
+      dealData.assignedTo = assignedOwner;
+
       await db.ref(paths.deals).push(dealData);
       logActivity('deal_created', `새 거래 등록: ${dealData.name}`);
     }
@@ -3980,7 +4241,18 @@ async function deleteDeal(dealId) {
 }
 
 // 커뮤니케이션 기능
+function updateCommHeader(title, subtitle = '') {
+  const header = document.getElementById('commHeader');
+  if (!header) return;
+  const textContainer = header.querySelector('.comm-header-text');
+  if (!textContainer) return;
+
+  const subtitleHtml = subtitle ? `<p>${subtitle}</p>` : '';
+  textContainer.innerHTML = `<h3>${title}</h3>${subtitleHtml}`;
+}
+
 function loadCommunications() {
+  updateCommHeader('고객을 선택해주세요');
   loadCommCustomerList();
 }
 
@@ -4010,8 +4282,11 @@ function loadCommCustomerList() {
         ${lastComm ? formatRelativeTime(lastComm.createdAt) : '이력 없음'}
       </div>
     `;
-    
+
     item.onclick = () => selectCustomerForComm(customer.id);
+    if (customer.id === selectedCustomerId) {
+      item.classList.add('active');
+    }
     list.appendChild(item);
   });
 }
@@ -4037,11 +4312,11 @@ function loadCustomerComms(customerId) {
   if (!customer) return;
   
   // 헤더 업데이트
-  const header = document.getElementById('commHeader');
-  header.innerHTML = `
-    <h3>${customer.company} ${customer.mainCustomer === 'Y' ? '<span class="badge badge-vip">주요고객</span>' : ''}</h3>
-    <p>${customer.manager || ''} | ${customer.phone1 || ''} | ${customer.email || ''}</p>
-  `;
+  const subtitleParts = [customer.manager || '', customer.phone1 || '', customer.email || '']
+    .filter(part => part && part.trim() !== '');
+  const subtitle = subtitleParts.join(' | ');
+  const titleHtml = `${customer.company || getCustomerDisplayName(customer)} ${customer.mainCustomer === 'Y' ? '<span class="badge badge-vip">주요고객</span>' : ''}`;
+  updateCommHeader(titleHtml, subtitle);
   
   // 타임라인 로드
   const timeline = document.getElementById('commTimeline');
@@ -4059,6 +4334,7 @@ function loadCustomerComms(customerId) {
   customerComms.forEach(comm => {
     const item = document.createElement('div');
     item.className = `timeline-item ${comm.type}`;
+    const authorName = formatUserDisplay(comm.createdBy);
     item.innerHTML = `
       <div class="timeline-icon">
         <i class="fas ${getCommIcon(comm.type)}"></i>
@@ -4072,7 +4348,10 @@ function loadCustomerComms(customerId) {
           ${comm.content}
         </div>
         <div class="timeline-footer">
-          <span>${comm.createdBy}</span>
+          <span>${authorName}</span>
+          <div class="timeline-actions">
+            <button class="timeline-action-btn" onclick="deleteCommunication('${comm.id}')">삭제</button>
+          </div>
         </div>
       </div>
     `;
@@ -4107,7 +4386,7 @@ async function addCommunication() {
   
   try {
     showLoading();
-    
+
     const commData = {
       customerId: selectedCustomerId,
       type: type,
@@ -4115,24 +4394,27 @@ async function addCommunication() {
       createdAt: new Date().toISOString(),
       createdBy: currentUser.email
     };
-    
-    await db.ref(paths.communications).push(commData);
-    
+
+    const newRef = await db.ref(paths.communications).push(commData);
+    const newComm = {id: newRef.key, ...commData};
+
     // 고객 최근 연락 업데이트
     await db.ref(`${paths.customers}/${selectedCustomerId}`).update({
       lastContact: new Date().toISOString()
     });
-    
+
     const customer = customers.find(c => c.id === selectedCustomerId);
-    logActivity('comm_added', `${customer.name}님과 ${getCommTypeLabel(type)}`);
-    
+    const customerName = getCustomerDisplayName(customer) || '고객';
+    logActivity('comm_added', `${customerName}과(와) ${getCommTypeLabel(type)}`);
+
     // 입력 필드 초기화
     document.getElementById('commContent').value = '';
-    
+
     // 이력 다시 로드
-    communications.push({id: Date.now().toString(), ...commData});
+    communications.push(newComm);
+    loadCommCustomerList();
     loadCustomerComms(selectedCustomerId);
-    
+
     showNotification('커뮤니케이션이 기록되었습니다.', 'success');
   } catch (error) {
     console.error('커뮤니케이션 추가 오류:', error);
@@ -4159,14 +4441,15 @@ function initializeCalendar() {
     },
     events: events.map(event => ({
       id: event.id,
-      title: event.title,
+      title: getEventCalendarTitle(event),
       start: event.start,
       end: event.end,
       color: getEventColor(event.type),
       extendedProps: {
         type: event.type,
         customerId: event.customerId,
-        description: event.description
+        description: event.description,
+        author: formatUserDisplay(event.createdBy || event.modifiedBy || '')
       }
     })),
     eventClick: function(info) {
@@ -4191,10 +4474,15 @@ function openEventModal(eventId = null, defaultDate = null) {
   customers.forEach(customer => {
     const option = document.createElement('option');
     option.value = customer.id;
-    option.textContent = customer.name;
+    option.textContent = getCustomerDisplayName(customer);
     customerSelect.appendChild(option);
   });
-  
+
+  const manualInput = document.getElementById('eventCustomerManual');
+  if (manualInput) {
+    manualInput.value = '';
+  }
+
   if (eventId) {
     title.textContent = '일정 수정';
     const event = events.find(e => e.id === eventId);
@@ -4202,6 +4490,9 @@ function openEventModal(eventId = null, defaultDate = null) {
       document.getElementById('eventTitle').value = event.title || '';
       document.getElementById('eventType').value = event.type || 'meeting';
       document.getElementById('eventCustomer').value = event.customerId || '';
+      if (manualInput && !event.customerId) {
+        manualInput.value = event.customCustomer || event.customerName || '';
+      }
       document.getElementById('eventStart').value = event.start || '';
       document.getElementById('eventEnd').value = event.end || '';
       document.getElementById('eventDescription').value = event.description || '';
@@ -4232,18 +4523,23 @@ function closeEventModal() {
 async function saveEvent() {
   const modal = document.getElementById('eventModal');
   const eventId = modal.dataset.eventId;
-  
+  const selectedCustomerId = document.getElementById('eventCustomer').value;
+  const manualCustomerName = document.getElementById('eventCustomerManual')?.value.trim() || '';
+  const resolvedCustomerName = selectedCustomerId ? getCustomerNameById(selectedCustomerId) : manualCustomerName;
+
   const eventData = {
     title: document.getElementById('eventTitle').value.trim(),
     type: document.getElementById('eventType').value,
-    customerId: document.getElementById('eventCustomer').value,
+    customerId: selectedCustomerId,
     start: document.getElementById('eventStart').value,
     end: document.getElementById('eventEnd').value,
     description: document.getElementById('eventDescription').value.trim(),
     modifiedAt: new Date().toISOString(),
-    modifiedBy: currentUser.email
+    modifiedBy: currentUser.email,
+    customCustomer: selectedCustomerId ? '' : manualCustomerName,
+    customerName: resolvedCustomerName
   };
-  
+
   if (!eventData.title || !eventData.start) {
     alert('제목과 시작 시간은 필수 입력 항목입니다.');
     return;
@@ -4258,7 +4554,8 @@ async function saveEvent() {
     } else {
       eventData.createdAt = new Date().toISOString();
       eventData.createdBy = currentUser.email;
-      
+      eventData.createdByName = formatUserDisplay(currentUser.email);
+
       await db.ref(paths.events).push(eventData);
       logActivity('event_created', `새 일정 등록: ${eventData.title}`);
     }
@@ -4282,20 +4579,56 @@ async function saveEvent() {
 function viewEvent(eventId) {
   const event = events.find(e => e.id === eventId);
   if (!event) return;
-  
+
   const customer = customers.find(c => c.id === event.customerId);
-  const customerName = customer ? customer.name : '없음';
-  
+  const customerName = event.customerId ? (getCustomerDisplayName(customer) || '없음') : (event.customCustomer || event.customerName || '없음');
+  const author = formatUserDisplay(event.createdBy || event.modifiedBy || '');
+  const startTime = formatDateTime(event.start);
+  const endTime = formatDateTime(event.end);
+
+  const headerTitle = [author, formatEventTime(event.start), event.title].filter(Boolean).join(' ') || event.title;
+
   const detailHtml = `
-    <h3>${event.title}</h3>
+    <h3>${headerTitle}</h3>
     <p><strong>유형:</strong> ${getEventTypeLabel(event.type)}</p>
+    <p><strong>등록자:</strong> ${author || '-'}</p>
     <p><strong>고객:</strong> ${customerName}</p>
-    <p><strong>시작:</strong> ${formatDateTime(event.start)}</p>
-    <p><strong>종료:</strong> ${formatDateTime(event.end)}</p>
+    <p><strong>시작:</strong> ${startTime}</p>
+    <p><strong>종료:</strong> ${endTime}</p>
     <p><strong>설명:</strong> ${event.description || '없음'}</p>
+    <div class="modal-footer" style="justify-content: flex-end; gap: 0.5rem;">
+      <button class="secondary-btn" onclick="openEventModal('${eventId}')">수정</button>
+      <button class="danger-btn" onclick="deleteEvent('${eventId}')">삭제</button>
+    </div>
   `;
-  
+
   showContentModal(detailHtml, '일정 상세');
+}
+
+async function deleteEvent(eventId) {
+  const event = events.find(e => e.id === eventId);
+  if (!event) return;
+
+  if (!confirm(`'${event.title}' 일정을 삭제하시겠습니까?`)) {
+    return;
+  }
+
+  try {
+    showLoading();
+    await db.ref(`${paths.events}/${eventId}`).remove();
+    events = events.filter(e => e.id !== eventId);
+    if (currentView === 'calendar') {
+      loadAllData().then(() => initializeCalendar());
+    }
+    logActivity('event_deleted', `일정 삭제: ${event.title}`);
+    showNotification('일정이 삭제되었습니다.', 'success');
+    closeContentModal();
+  } catch (error) {
+    console.error('일정 삭제 오류:', error);
+    showNotification('일정 삭제에 실패했습니다.', 'error');
+  } finally {
+    hideLoading();
+  }
 }
 
 // 캘린더 동기화
@@ -4889,8 +5222,10 @@ function getActivityIcon(type) {
     deal_moved: 'fa-arrows-alt',
     deal_deleted: 'fa-times',
     comm_added: 'fa-comment',
+    comm_deleted: 'fa-comment-slash',
     event_created: 'fa-calendar-plus',
-    event_updated: 'fa-calendar-check'
+    event_updated: 'fa-calendar-check',
+    event_deleted: 'fa-calendar-minus'
   };
   return icons[type] || 'fa-info-circle';
 }
@@ -5167,8 +5502,20 @@ async function importCustomerData(data, mode = 'partial') {
       registrant,
       createdAt: new Date().toISOString(),
       createdBy: registrant,
-      modifiedBy: currentUser.email
+      modifiedBy: currentUser.email,
+      registrantName: formatUserDisplay(registrant),
+      createdByName: formatUserDisplay(registrant)
     };
+
+    const remarkHistory = [];
+    if (customerData.remark) {
+      remarkHistory.push({
+        timestamp: new Date().toISOString(),
+        value: customerData.remark,
+        modifiedBy: currentUser.email
+      });
+    }
+    customerData.remarkHistory = remarkHistory;
 
     if (customerData.no && customerData.company) {
       batch.push(db.ref(paths.customers).push(customerData));

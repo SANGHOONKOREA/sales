@@ -340,6 +340,7 @@
         <th>등록자 <i class="fas fa-sort"></i></th>
         <th>등록일 <i class="fas fa-sort"></i></th>
         <th>비고 <i class="fas fa-sort"></i></th>
+        <th>히스토리</th>
         <th>편집</th>
       </tr>
     </thead>
@@ -586,7 +587,12 @@
           <!-- 오른쪽: 커뮤니케이션 이력 -->
           <div class="comm-main">
             <div class="comm-header" id="commHeader">
-              <h3>고객을 선택해주세요</h3>
+              <div class="comm-header-text">
+                <h3>고객을 선택해주세요</h3>
+              </div>
+              <button class="secondary-btn" onclick="openCustomerModal()">
+                <i class="fas fa-user-plus"></i> 고객 추가
+              </button>
             </div>
             <div class="comm-timeline" id="commTimeline">
               <!-- 타임라인 -->
@@ -829,6 +835,8 @@
         <select id="dealCustomer" required>
           <option value="">고객 선택</option>
         </select>
+        <input type="text" id="dealCustomerManual" placeholder="직접 입력 (선택)">
+        <small class="field-hint">목록에 없다면 직접 입력하세요.</small>
       </div>
       <div class="form-group">
         <label>예상 금액</label>
@@ -890,6 +898,8 @@
         <select id="eventCustomer">
           <option value="">고객 선택</option>
         </select>
+        <input type="text" id="eventCustomerManual" placeholder="직접 입력 (선택)">
+        <small class="field-hint">목록에 없다면 직접 입력하세요.</small>
       </div>
       <div class="form-group">
         <label>시작 시간</label>

@@ -1501,18 +1501,27 @@ th[data-field="modifiedDate"], td[data-field="modifiedDate"] { min-width: 120px;
 .comm-header {
   padding: 1.5rem;
   border-bottom: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
 }
 
-.comm-header h3 {
+.comm-header-text h3 {
   font-size: 1.125rem;
   margin: 0 0 0.5rem;
   color: var(--text-color);
 }
 
-.comm-header p {
+.comm-header-text p {
   font-size: 0.875rem;
   color: var(--text-muted);
   margin: 0;
+}
+
+.comm-header .badge {
+  position: static;
+  margin-left: 0.5rem;
 }
 
 .comm-timeline {
@@ -1573,11 +1582,6 @@ th[data-field="modifiedDate"], td[data-field="modifiedDate"] { min-width: 120px;
   font-size: 0.875rem;
   line-height: 1.5;
   margin-bottom: 0.5rem;
-}
-
-.timeline-footer {
-  font-size: 0.75rem;
-  color: var(--text-muted);
 }
 
 .comm-input {
@@ -1722,6 +1726,96 @@ th[data-field="modifiedDate"], td[data-field="modifiedDate"] { min-width: 120px;
 
 .data-table td.main-customer-cell {
   text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.main-customer-cell .badge {
+  position: static;
+  margin: 0;
+}
+
+.customer-info .badge {
+  position: static;
+}
+
+.history-btn {
+  padding: 0.35rem 0.75rem;
+  background-color: var(--light-color);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  font-size: 0.75rem;
+  color: var(--text-color);
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.history-btn:hover {
+  background-color: var(--primary-light);
+  color: var(--primary-color);
+}
+
+.field-hint {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.timeline-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.timeline-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.timeline-action-btn {
+  background: none;
+  border: none;
+  color: var(--danger-color);
+  cursor: pointer;
+  font-size: 0.75rem;
+  padding: 0;
+  text-decoration: underline;
+}
+
+.timeline-action-btn:hover {
+  color: #a94442;
+}
+
+.remark-history-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.remark-history-item {
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.remark-history-item:last-child {
+  border-bottom: none;
+}
+
+.remark-history-meta {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-bottom: 0.35rem;
+}
+
+.deal-owner {
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
 }
 
 .settings-admin-actions {

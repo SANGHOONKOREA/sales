@@ -1,19 +1,17 @@
 // 통합 CRM Pro - 전문 고객 관계 및 영업 관리 시스템
 // Firebase 초기화
 const firebaseConfig = {
-  apiKey: "AIzaSyCoOg2HPjk-oEhtVrLv3hH-3VLCwa2MAfE",
-  authDomain: "sanghoon-d8f1c.firebaseapp.com",
-  databaseURL: "https://sanghoon-d8f1c-default-rtdb.firebaseio.com",
-  projectId: "sanghoon-d8f1c",
-  storageBucket: "sanghoon-d8f1c.appspot.com",
-  messagingSenderId: "495391900753",
-  appId: "1:495391900753:web:b0d708eeca64fafe562470",
+  apiKey: "AIzaSyDylEzWAPbo6kfMYwxjjSHXT4bnb1bJWzg",
+  authDomain: "snsys-sales.firebaseapp.com",
+  databaseURL: "https://snsys-sales-default-rtdb.firebaseio.com/",
+  projectId: "snsys-sales",
+  messagingSenderId: "354545968756",
+  appId: "1:354545968756:web:78420f41ca3335f5bf1321",
   measurementId: "G-J2E22BW61H"
 };
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 const auth = firebase.auth();
-const storage = firebase.storage();
 
 // 전역 변수
 let currentUser = null;

@@ -18,6 +18,10 @@ let currentUser = null;
 let currentUid = null;
 let isAdmin = false;
 let adminEmails = [];
+const DEFAULT_ADMIN_EMAIL = 'sanghoon.seo@snsys.net';
+let mainUsersData = {};
+let userRecords = {};
+let userMetaCache = null;
 
 // CRM 데이터
 let customers = [];
@@ -147,6 +151,7 @@ function initializeEventListeners() {
   document.getElementById('userManageBtn')?.addEventListener('click', () => checkAdminAccess(openUserModal));
   document.getElementById('addUserConfirmBtn')?.addEventListener('click', addNewUser);
   document.getElementById('deleteSelectedUsersBtn')?.addEventListener('click', deleteSelectedUsers);
+  document.getElementById('saveUserChangesBtn')?.addEventListener('click', saveUserChanges);
   
   // 열 리사이징
   document.addEventListener('mousedown', handleMouseDown);
@@ -203,6 +208,7 @@ function checkAuthState() {
       currentUser = null;
       currentUid = null;
       isAdmin = false;
+      updateAdminButtonsVisibility();
       showLoginInterface();
     }
   });
@@ -221,6 +227,7 @@ async function loadUserData() {
     // 사용자 정보 표시
     const mainUsersSnapshot = await db.ref(paths.mainUsers).once('value');
     const mainUsers = mainUsersSnapshot.val() || {};
+    mainUsersData = mainUsers;
     
     let displayName = currentUser.email;
     for (const uid in mainUsers) {
@@ -252,35 +259,66 @@ async function loadAdminEmails() {
   try {
     const snapshot = await db.ref(paths.adminEmails).once('value');
     const data = snapshot.val();
-    
-    if (data) {
-      if (Array.isArray(data)) {
-        adminEmails = data;
-      } else if (typeof data === 'object') {
-        adminEmails = Object.values(data).filter(email => typeof email === 'string');
-      } else {
-        adminEmails = [];
-      }
-    } else {
-      // 기본 관리자 설정
-      const defaultAdmins = ['sanghoon.seo@snsys.net'];
-      await db.ref(paths.adminEmails).set(defaultAdmins);
-      adminEmails = defaultAdmins;
+    const storedList = Array.isArray(data)
+      ? data
+      : (typeof data === 'object'
+        ? Object.values(data).filter(email => typeof email === 'string')
+        : []);
+
+    const normalizedStored = getUniqueEmailList(storedList);
+    const includesDefault = normalizedStored.some(email => normalizeEmail(email) === normalizeEmail(DEFAULT_ADMIN_EMAIL));
+
+    const uniqueAdmins = getUniqueEmailList([...normalizedStored, DEFAULT_ADMIN_EMAIL]);
+
+    const shouldPersist = !data
+      || normalizedStored.length !== storedList.length
+      || !includesDefault
+      || uniqueAdmins.length !== normalizedStored.length;
+
+    adminEmails = uniqueAdmins;
+
+    if (shouldPersist) {
+      await db.ref(paths.adminEmails).set(adminEmails);
     }
-    
+
     console.log('관리자 이메일 목록:', adminEmails);
   } catch (error) {
     console.error('관리자 이메일 로드 오류:', error);
-    adminEmails = ['sanghoon.seo@snsys.net'];
+    adminEmails = [DEFAULT_ADMIN_EMAIL];
   }
+}
+
+function normalizeEmail(email) {
+  return (email || '').trim().toLowerCase();
+}
+
+function getUniqueEmailList(emails) {
+  const normalizedSet = new Set();
+  const uniqueEmails = [];
+
+  (emails || []).forEach(email => {
+    const normalized = normalizeEmail(email);
+    if (!normalized || normalizedSet.has(normalized)) return;
+    normalizedSet.add(normalized);
+    uniqueEmails.push((email || '').trim());
+  });
+
+  return uniqueEmails;
+}
+
+function isEmailAdmin(email) {
+  const normalized = normalizeEmail(email);
+  if (!normalized || !Array.isArray(adminEmails)) return false;
+  return adminEmails.some(adminEmail => normalizeEmail(adminEmail) === normalized);
+}
+
+function normalizeRole(role) {
+  return (role || '').trim().toLowerCase();
 }
 
 // 관리자 확인
 function checkUserIsAdmin(email) {
-  if (!email || !Array.isArray(adminEmails)) return false;
-  return adminEmails.some(adminEmail => 
-    adminEmail.toLowerCase() === email.toLowerCase()
-  );
+  return isEmailAdmin(email);
 }
 
 // 관리자 권한 확인
@@ -305,7 +343,7 @@ function updateAdminButtonsVisibility() {
     const btn = document.getElementById(btnId);
     if (btn) {
       if (isAdmin) {
-        btn.style.display = btnId === 'userManageBtn' ? 'block' : 'inline-block';
+        btn.style.display = btnId === 'userManageBtn' ? 'inline-flex' : 'inline-block';
         btn.style.visibility = 'visible';
         btn.disabled = false;
       } else {
@@ -313,6 +351,11 @@ function updateAdminButtonsVisibility() {
       }
     }
   });
+
+  const adminActions = document.getElementById('settingsAdminActions');
+  if (adminActions) {
+    adminActions.style.display = isAdmin ? 'flex' : 'none';
+  }
 }
 
 // 로그인 인터페이스 표시
@@ -1077,6 +1120,14 @@ async function saveCustomer() {
   } finally {
     hideLoading();
   }
+}
+
+function closeCustomerModal() {
+  const modal = document.getElementById('customerModal');
+  if (!modal) return;
+
+  modal.style.display = 'none';
+  modal.dataset.customerId = '';
 }
 
 // 고객 편집
@@ -2941,45 +2992,365 @@ function updateSalesInsights(data) {
   container.innerHTML = insights.map(insight => `<div style="margin-bottom: 8px;">• ${insight}</div>`).join('');
 }
 
+async function resolveUidByEmail(email) {
+  const normalized = normalizeEmail(email);
+  if (!normalized) return null;
+
+  const findUid = (records) => {
+    if (!records || typeof records !== 'object') return null;
+    for (const [uid, data] of Object.entries(records)) {
+      if (normalizeEmail(data?.email) === normalized) {
+        return data?.uid || uid;
+      }
+    }
+    return null;
+  };
+
+  const refreshMainUsers = async () => {
+    try {
+      const snapshot = await db.ref(paths.mainUsers).once('value');
+      mainUsersData = snapshot.val() || {};
+    } catch (error) {
+      console.error('메인 사용자 목록 로드 오류:', error);
+      mainUsersData = {};
+    }
+  };
+
+  const refreshUserMeta = async () => {
+    try {
+      const metaSnapshot = await db.ref(paths.userMeta).once('value');
+      userMetaCache = metaSnapshot.val() || {};
+    } catch (error) {
+      console.error('사용자 메타데이터 로드 오류:', error);
+      userMetaCache = {};
+    }
+  };
+
+  if (!mainUsersData || !Object.keys(mainUsersData).length) {
+    await refreshMainUsers();
+  }
+
+  let resolved = findUid(mainUsersData);
+  if (!resolved) {
+    await refreshMainUsers();
+    resolved = findUid(mainUsersData);
+  }
+  if (resolved) return resolved;
+
+  resolved = findUid(userRecords);
+  if (resolved) return resolved;
+
+  if (!userMetaCache || !Object.keys(userMetaCache).length) {
+    await refreshUserMeta();
+  }
+
+  resolved = findUid(userMetaCache);
+  if (!resolved) {
+    await refreshUserMeta();
+    resolved = findUid(userMetaCache);
+  }
+
+  return resolved;
+}
+
+async function verifyEmailRegistration(email, existingUid = null) {
+  const normalized = normalizeEmail(email);
+  if (!normalized) {
+    return { registered: false, uid: null };
+  }
+
+  let resolvedUid = existingUid || null;
+
+  if (!resolvedUid) {
+    resolvedUid = await resolveUidByEmail(normalized);
+  }
+
+  if (resolvedUid) {
+    return { registered: true, uid: resolvedUid };
+  }
+
+  try {
+    const methods = await auth.fetchSignInMethodsForEmail(normalized);
+    if (Array.isArray(methods) && methods.length > 0) {
+      return { registered: true, uid: null };
+    }
+  } catch (error) {
+    if (error?.code === 'auth/invalid-email') {
+      throw error;
+    }
+    console.warn('이메일 인증 방법 조회 실패:', error);
+  }
+
+  try {
+    const response = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:createAuthUri?key=${firebaseConfig.apiKey}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        identifier: normalized,
+        continueUri: (typeof window !== 'undefined' && window?.location?.origin) || 'https://snsys.net'
+      })
+    });
+
+    const data = await response.json();
+
+    if (data?.registered) {
+      return { registered: true, uid: null };
+    }
+
+    if (data?.error) {
+      console.warn('Firebase createAuthUri 오류:', data.error);
+    }
+  } catch (error) {
+    console.error('Firebase 등록 이메일 확인 오류:', error);
+  }
+
+  return { registered: false, uid: null };
+}
+
+async function ensureDefaultAdminRecord() {
+  const defaultNormalized = normalizeEmail(DEFAULT_ADMIN_EMAIL);
+  const existingEntry = Object.entries(userRecords || {}).find(([, data]) => normalizeEmail(data?.email) === defaultNormalized);
+
+  if (existingEntry) {
+    const [uid, data] = existingEntry;
+    if (normalizeRole(data?.role) !== 'admin') {
+      userRecords[uid] = {
+        ...data,
+        role: 'admin'
+      };
+      try {
+        await db.ref(`${paths.users}/${uid}`).update({ role: 'admin' });
+      } catch (error) {
+        console.error('기본 관리자 권한 업데이트 오류:', error);
+      }
+    }
+    return;
+  }
+
+  const resolvedUid = await resolveUidByEmail(DEFAULT_ADMIN_EMAIL);
+  const recordKey = resolvedUid || db.ref(paths.users).push().key;
+  const timestamp = new Date().toISOString();
+  const defaultName = mainUsersData?.[recordKey]?.id || DEFAULT_ADMIN_EMAIL.split('@')[0];
+  const defaultDepartment = mainUsersData?.[recordKey]?.department || '';
+
+  const newRecord = {
+    email: DEFAULT_ADMIN_EMAIL,
+    uid: recordKey,
+    name: defaultName,
+    username: defaultName,
+    department: defaultDepartment,
+    role: 'admin',
+    createdAt: timestamp,
+    updatedAt: timestamp,
+    updatedBy: 'system'
+  };
+
+  try {
+    await db.ref(`${paths.users}/${recordKey}`).set(newRecord);
+    userRecords[recordKey] = newRecord;
+  } catch (error) {
+    console.error('기본 관리자 등록 오류:', error);
+  }
+
+  if (!isEmailAdmin(DEFAULT_ADMIN_EMAIL)) {
+    adminEmails = getUniqueEmailList([...adminEmails, DEFAULT_ADMIN_EMAIL]);
+    try {
+      await db.ref(paths.adminEmails).set(adminEmails);
+    } catch (error) {
+      console.error('기본 관리자 목록 저장 오류:', error);
+    }
+  }
+}
+
+function transformUserRecords(records) {
+  const entries = Object.entries(records || {}).map(([uid, data]) => {
+    const email = data?.email || '';
+    let role = normalizeRole(data?.role);
+
+    if (!role) {
+      role = isEmailAdmin(email) ? 'admin' : 'user';
+    }
+
+    if (normalizeEmail(email) === normalizeEmail(DEFAULT_ADMIN_EMAIL)) {
+      role = 'admin';
+    }
+
+    if (data && typeof data === 'object') {
+      data.role = role;
+      data.uid = data.uid || uid;
+      if (!data.name && data.username) {
+        data.name = data.username;
+      }
+    }
+
+    return {
+      uid,
+      email,
+      name: data?.name || data?.username || '',
+      department: data?.department || '',
+      role
+    };
+  });
+
+  entries.sort((a, b) => (a.email || '').localeCompare(b.email || ''));
+  return entries;
+}
+
+async function syncAdminListWithRecords() {
+  const normalizedSet = new Set();
+  const adminList = [];
+
+  const pushEmail = (email) => {
+    const normalized = normalizeEmail(email);
+    if (!normalized || normalizedSet.has(normalized)) return;
+    normalizedSet.add(normalized);
+    adminList.push((email || '').trim());
+  };
+
+  pushEmail(DEFAULT_ADMIN_EMAIL);
+
+  Object.values(userRecords || {}).forEach(user => {
+    if (normalizeRole(user?.role) === 'admin') {
+      pushEmail(user.email);
+    }
+  });
+
+  adminEmails = adminList;
+
+  await db.ref(paths.adminEmails).set(adminEmails);
+
+  if (currentUser) {
+    isAdmin = checkUserIsAdmin(currentUser.email);
+    updateAdminButtonsVisibility();
+  }
+}
+
 // 사용자 관리 모달 열기
-function openUserModal() {
-  db.ref(paths.users).once('value').then(snap => {
-    const val = snap.val() || {};
-    const userData = Object.entries(val).map(([k, v]) => ({uid: k, ...v}));
+async function openUserModal() {
+  try {
+    const snap = await db.ref(paths.users).once('value');
+    userRecords = snap.val() || {};
+    await ensureDefaultAdminRecord();
+    const userData = transformUserRecords(userRecords);
     renderUserList(userData);
     document.getElementById('userModal').style.display = 'block';
-  });
+  } catch (error) {
+    console.error('사용자 목록 로드 오류:', error);
+    alert('사용자 목록을 불러오는 중 문제가 발생했습니다. 잠시 후 다시 시도해주세요.');
+  }
 }
 
 // 사용자 목록 렌더링
 function renderUserList(userData) {
-  const listDiv = document.getElementById('userList');
-  listDiv.innerHTML = '';
-  userData.forEach(u => {
-    const row = document.createElement('div');
-    row.style.marginBottom = '4px';
-    
+  const tableBody = document.getElementById('userTableBody');
+  if (!tableBody) return;
+
+  tableBody.innerHTML = '';
+
+  if (!userData.length) {
+    const emptyRow = document.createElement('tr');
+    const emptyCell = document.createElement('td');
+    emptyCell.colSpan = 5;
+    emptyCell.className = 'user-table-empty';
+    emptyCell.textContent = '등록된 사용자가 없습니다.';
+    emptyRow.appendChild(emptyCell);
+    tableBody.appendChild(emptyRow);
+    return;
+  }
+
+  userData.forEach(user => {
+    const row = document.createElement('tr');
+    row.dataset.uid = user.uid;
+    row.dataset.email = user.email || '';
+
+    const selectCell = document.createElement('td');
     const chk = document.createElement('input');
     chk.type = 'checkbox';
-    chk.dataset.uid = u.uid;
-    chk.style.marginRight = '6px';
-    row.appendChild(chk);
+    chk.className = 'user-select';
+    chk.dataset.uid = user.uid;
+    chk.dataset.email = user.email || '';
+    if (normalizeEmail(user.email) === normalizeEmail(DEFAULT_ADMIN_EMAIL)) {
+      chk.disabled = true;
+      chk.title = '초기 관리자 계정은 삭제할 수 없습니다.';
+    }
+    selectCell.appendChild(chk);
+    row.appendChild(selectCell);
 
-    const txt = document.createElement('span');
-    txt.textContent = `${u.username || u.email}`;
-    
-    if (u.email) {
-      txt.textContent += ` (${u.email})`;
+    const emailCell = document.createElement('td');
+    emailCell.className = 'user-email';
+    const emailText = document.createElement('div');
+    emailText.textContent = user.email || '-';
+    emailCell.appendChild(emailText);
+
+    const roleLabel = document.createElement('span');
+    roleLabel.className = 'user-role-badge';
+    if (normalizeEmail(user.email) === normalizeEmail(DEFAULT_ADMIN_EMAIL)) {
+      roleLabel.textContent = '초기 관리자';
+      roleLabel.classList.add('primary');
+      emailCell.appendChild(roleLabel);
+    } else if (normalizeRole(user.role) === 'admin') {
+      roleLabel.textContent = '관리자';
+      emailCell.appendChild(roleLabel);
+    } else if (normalizeRole(user.role) === 'manager') {
+      roleLabel.textContent = '매니저';
+      roleLabel.classList.add('info');
+      emailCell.appendChild(roleLabel);
     }
-    
-    if (adminEmails.includes(u.email)) {
-      txt.textContent += ' - 관리자';
-      txt.style.color = '#dc3545';
-      txt.style.fontWeight = 'bold';
+
+    row.appendChild(emailCell);
+
+    const nameCell = document.createElement('td');
+    const nameInput = document.createElement('input');
+    nameInput.type = 'text';
+    nameInput.value = user.name || '';
+    nameInput.placeholder = '이름';
+    nameInput.dataset.uid = user.uid;
+    nameInput.dataset.field = 'name';
+    nameCell.appendChild(nameInput);
+    row.appendChild(nameCell);
+
+    const deptCell = document.createElement('td');
+    const deptInput = document.createElement('input');
+    deptInput.type = 'text';
+    deptInput.value = user.department || '';
+    deptInput.placeholder = '부서';
+    deptInput.dataset.uid = user.uid;
+    deptInput.dataset.field = 'department';
+    deptCell.appendChild(deptInput);
+    row.appendChild(deptCell);
+
+    const roleCell = document.createElement('td');
+    const roleSelect = document.createElement('select');
+    roleSelect.dataset.uid = user.uid;
+    roleSelect.dataset.field = 'role';
+
+    const roleOptions = [
+      { value: 'user', label: '일반' },
+      { value: 'manager', label: '매니저' },
+      { value: 'admin', label: '관리자' }
+    ];
+
+    roleOptions.forEach(option => {
+      const opt = document.createElement('option');
+      opt.value = option.value;
+      opt.textContent = option.label;
+      if (normalizeRole(user.role) === option.value) {
+        opt.selected = true;
+      }
+      roleSelect.appendChild(opt);
+    });
+
+    if (normalizeEmail(user.email) === normalizeEmail(DEFAULT_ADMIN_EMAIL)) {
+      roleSelect.value = 'admin';
+      roleSelect.disabled = true;
     }
-    
-    row.appendChild(txt);
-    listDiv.appendChild(row);
+
+    roleCell.appendChild(roleSelect);
+    row.appendChild(roleCell);
+
+    tableBody.appendChild(row);
   });
 }
 
@@ -2989,97 +3360,217 @@ function closeUserModal() {
 }
 
 // 선택된 사용자 삭제
-function deleteSelectedUsers() {
-  const cks = document.querySelectorAll('#userList input[type=checkbox]:checked');
-  if (!cks.length) {
-    alert("삭제할 사용자를 선택하세요.");
+async function deleteSelectedUsers() {
+  const selected = document.querySelectorAll('#userTableBody input.user-select:checked');
+  if (!selected.length) {
+    alert('삭제할 사용자를 선택하세요.');
     return;
   }
-  if (!confirm("선택한 사용자들을 삭제하시겠습니까?")) return;
+
+  const hasDefaultAdmin = Array.from(selected).some(chk => normalizeEmail(chk.dataset.email) === normalizeEmail(DEFAULT_ADMIN_EMAIL));
+  if (hasDefaultAdmin) {
+    alert('초기 관리자 계정은 삭제할 수 없습니다.');
+    return;
+  }
+
+  if (!confirm('선택한 사용자들을 삭제하시겠습니까?')) return;
 
   const updates = {};
-  cks.forEach(chk => {
+  const removedUids = [];
+
+  selected.forEach(chk => {
     const uid = chk.dataset.uid;
+    if (!uid) return;
     updates[uid] = null;
+    removedUids.push(uid);
   });
 
-  db.ref(paths.users).update(updates)
-    .then(() => {
-      return db.ref(paths.users).once('value');
-    })
-    .then(snap => {
-      const val = snap.val() || {};
-      const userData = Object.entries(val).map(([k, v]) => ({uid: k, ...v}));
-      renderUserList(userData);
-    });
+  try {
+    await db.ref(paths.users).update(updates);
+    removedUids.forEach(uid => delete userRecords[uid]);
+    await ensureDefaultAdminRecord();
+    await syncAdminListWithRecords();
+    renderUserList(transformUserRecords(userRecords));
+    alert('선택한 사용자가 삭제되었습니다.');
+  } catch (error) {
+    console.error('사용자 삭제 오류:', error);
+    alert('사용자를 삭제하는 중 오류가 발생했습니다. 다시 시도해주세요.');
+  }
+}
+
+// 사용자 정보 저장
+async function saveUserChanges() {
+  const rows = document.querySelectorAll('#userTableBody tr[data-uid]');
+  if (!rows.length) {
+    alert('저장할 사용자 정보가 없습니다.');
+    return;
+  }
+
+  const updates = {};
+  const timestamp = new Date().toISOString();
+
+  rows.forEach(row => {
+    const uid = row.dataset.uid;
+    const email = row.dataset.email || row.querySelector('.user-email div')?.textContent || '';
+    if (!uid || !email) return;
+
+    const nameInput = row.querySelector('input[data-field="name"]');
+    const deptInput = row.querySelector('input[data-field="department"]');
+    const roleSelect = row.querySelector('select[data-field="role"]');
+
+    const name = nameInput ? nameInput.value.trim() : '';
+    const department = deptInput ? deptInput.value.trim() : '';
+    let role = roleSelect ? normalizeRole(roleSelect.value) : 'user';
+
+    if (!['user', 'manager', 'admin'].includes(role)) {
+      role = 'user';
+    }
+
+    if (normalizeEmail(email) === normalizeEmail(DEFAULT_ADMIN_EMAIL)) {
+      role = 'admin';
+    }
+
+    const existing = userRecords[uid] || {};
+
+    updates[uid] = {
+      ...existing,
+      email,
+      uid: existing.uid || uid,
+      name,
+      username: name,
+      department,
+      role,
+      updatedAt: timestamp,
+      updatedBy: currentUser?.email || ''
+    };
+
+    if (!existing.createdAt) {
+      updates[uid].createdAt = timestamp;
+    }
+  });
+
+  if (!Object.keys(updates).length) {
+    alert('변경된 내용이 없습니다.');
+    return;
+  }
+
+  try {
+    await db.ref(paths.users).update(updates);
+    userRecords = { ...userRecords, ...updates };
+    await syncAdminListWithRecords();
+    alert('사용자 정보가 저장되었습니다.');
+    renderUserList(transformUserRecords(userRecords));
+  } catch (error) {
+    console.error('사용자 정보 저장 오류:', error);
+    alert('사용자 정보를 저장하는 중 오류가 발생했습니다. 다시 시도해주세요.');
+  }
 }
 
 // 새 사용자 추가
-function addNewUser() {
-  const uname = document.getElementById('newUserName').value.trim();
-  const email = document.getElementById('newUserEmail').value.trim();
-  const isAdminUser = document.getElementById('newUserAdmin').checked;
-  
-  if (!uname || !email) {
-    alert("사용자명과 이메일은 필수 입력사항입니다.");
+async function addNewUser() {
+  const emailInput = document.getElementById('newUserEmail');
+  const nameInput = document.getElementById('newUserName');
+  const deptInput = document.getElementById('newUserDepartment');
+  const roleSelect = document.getElementById('newUserRole');
+
+  const email = emailInput?.value.trim() || '';
+  const name = nameInput?.value.trim() || '';
+  const department = deptInput?.value.trim() || '';
+  let role = normalizeRole(roleSelect?.value || 'user');
+
+  if (!['user', 'manager', 'admin'].includes(role)) {
+    role = 'user';
+  }
+
+  if (!email) {
+    alert('이메일을 입력해주세요.');
+    emailInput?.focus();
     return;
   }
-  
-  if (!email.includes('@')) {
-    alert("올바른 이메일 형식을 입력해주세요.");
+
+  if (!name) {
+    alert('이름을 입력해주세요.');
+    nameInput?.focus();
     return;
   }
-  
-  // 임시 비밀번호 생성 (영문+숫자 8자리)
-  const tempPassword = 'temp' + Math.random().toString(36).substr(2, 4).toUpperCase();
-  
-  auth.createUserWithEmailAndPassword(email, tempPassword)
-    .then(async (userCredential) => {
-      const user = userCredential.user;
-      
-      // 사용자 정보 저장
-      await db.ref(`${paths.users}/${user.uid}`).set({
-        username: uname,
-        email: email,
-        uid: user.uid,
-        createdAt: new Date().toISOString(),
-        isFirstLogin: true
-      });
-      
-      // 관리자로 설정한 경우
-      if (isAdminUser) {
-        const currentAdmins = await db.ref(paths.adminEmails).once('value');
-        const adminList = currentAdmins.val() || [];
-        if (!adminList.includes(email)) {
-          adminList.push(email);
-          await db.ref(paths.adminEmails).set(adminList);
-        }
-      }
-      
-      // 비밀번호 재설정 이메일 발송
-      await auth.sendPasswordResetEmail(email);
-      
-      alert(`사용자 등록 완료!\n임시 비밀번호: ${tempPassword}\n\n비밀번호 재설정 이메일이 발송되었습니다.`);
-      
-      document.getElementById('newUserName').value = '';
-      document.getElementById('newUserEmail').value = '';
-      document.getElementById('newUserAdmin').checked = false;
-      
-      return db.ref(paths.users).once('value');
-    })
-    .then(snap => {
-      const val = snap.val() || {};
-      const userData = Object.entries(val).map(([k, v]) => ({uid: k, ...v}));
-      renderUserList(userData);
-    })
-    .catch((error) => {
-      console.error("사용자 추가 오류:", error);
-      if (error.code === 'auth/email-already-in-use') {
-        alert("이미 등록된 이메일입니다.");
-      } else {
-        alert("사용자 추가 실패: " + error.message);
-      }
-    });
+
+  if (!department) {
+    alert('부서를 입력해주세요.');
+    deptInput?.focus();
+    return;
+  }
+
+  if (normalizeEmail(email) === normalizeEmail(DEFAULT_ADMIN_EMAIL)) {
+    role = 'admin';
+  }
+
+  const normalized = normalizeEmail(email);
+  let recordKey = Object.keys(userRecords || {}).find(key => normalizeEmail(userRecords[key]?.email) === normalized) || null;
+  let resolvedUid = recordKey || null;
+
+  let verification;
+  try {
+    verification = await verifyEmailRegistration(email, resolvedUid);
+  } catch (error) {
+    console.error('이메일 확인 오류:', error);
+    if (error?.code === 'auth/invalid-email') {
+      alert('올바른 이메일 형식을 입력해주세요.');
+      emailInput?.focus();
+    } else {
+      alert('이메일 확인 중 오류가 발생했습니다: ' + (error?.message || '알 수 없는 오류'));
+    }
+    return;
+  }
+
+  if (!verification?.registered) {
+    alert('Firebase Authentication에 등록된 이메일만 추가할 수 있습니다.');
+    return;
+  }
+
+  if (verification.uid) {
+    resolvedUid = verification.uid;
+  }
+
+  if (!recordKey) {
+    recordKey = resolvedUid || db.ref(paths.users).push().key;
+  }
+
+  const timestamp = new Date().toISOString();
+  const existingData = userRecords[recordKey] || {};
+
+  const newRecord = {
+    ...existingData,
+    email,
+    uid: existingData.uid || recordKey,
+    name,
+    username: name,
+    department,
+    role,
+    updatedAt: timestamp,
+    updatedBy: currentUser?.email || ''
+  };
+
+  if (!existingData.createdAt) {
+    newRecord.createdAt = timestamp;
+  }
+
+  try {
+    await db.ref(`${paths.users}/${recordKey}`).set(newRecord);
+    userRecords[recordKey] = newRecord;
+    await ensureDefaultAdminRecord();
+    await syncAdminListWithRecords();
+    renderUserList(transformUserRecords(userRecords));
+
+    if (emailInput) emailInput.value = '';
+    if (nameInput) nameInput.value = '';
+    if (deptInput) deptInput.value = '';
+    if (roleSelect) roleSelect.value = 'user';
+
+    alert(existingData && existingData.email ? '이미 등록된 사용자의 정보가 업데이트되었습니다.' : '사용자가 추가되었습니다.');
+  } catch (error) {
+    console.error('사용자 추가 오류:', error);
+    alert('사용자를 추가하는 중 오류가 발생했습니다. 다시 시도해주세요.');
+  }
 }
 
 // 내용 모달 열기

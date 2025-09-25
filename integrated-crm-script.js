@@ -208,6 +208,7 @@ function checkAuthState() {
       currentUser = null;
       currentUid = null;
       isAdmin = false;
+      updateAdminButtonsVisibility();
       showLoginInterface();
     }
   });
@@ -342,7 +343,7 @@ function updateAdminButtonsVisibility() {
     const btn = document.getElementById(btnId);
     if (btn) {
       if (isAdmin) {
-        btn.style.display = btnId === 'userManageBtn' ? 'block' : 'inline-block';
+        btn.style.display = btnId === 'userManageBtn' ? 'inline-flex' : 'inline-block';
         btn.style.visibility = 'visible';
         btn.disabled = false;
       } else {
@@ -350,6 +351,11 @@ function updateAdminButtonsVisibility() {
       }
     }
   });
+
+  const adminActions = document.getElementById('settingsAdminActions');
+  if (adminActions) {
+    adminActions.style.display = isAdmin ? 'flex' : 'none';
+  }
 }
 
 // 로그인 인터페이스 표시
@@ -1114,6 +1120,14 @@ async function saveCustomer() {
   } finally {
     hideLoading();
   }
+}
+
+function closeCustomerModal() {
+  const modal = document.getElementById('customerModal');
+  if (!modal) return;
+
+  modal.style.display = 'none';
+  modal.dataset.customerId = '';
 }
 
 // 고객 편집

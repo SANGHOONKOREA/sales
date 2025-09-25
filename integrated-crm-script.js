@@ -3006,6 +3006,16 @@ async function resolveUidByEmail(email) {
     return null;
   };
 
+  if (!mainUsersData || !Object.keys(mainUsersData).length) {
+    try {
+      const snapshot = await db.ref(paths.mainUsers).once('value');
+      mainUsersData = snapshot.val() || {};
+    } catch (error) {
+      console.error('메인 사용자 목록 로드 오류:', error);
+      mainUsersData = {};
+    }
+  }
+
   let resolved = findUid(mainUsersData);
   if (resolved) return resolved;
 
@@ -3421,27 +3431,37 @@ async function addNewUser() {
     role = 'admin';
   }
 
-  try {
-    const methods = await auth.fetchSignInMethodsForEmail(email);
-    if (!methods || !methods.length) {
-      alert('Firebase Authentication에 등록된 이메일만 추가할 수 있습니다.');
+  const normalized = normalizeEmail(email);
+  let recordKey = Object.keys(userRecords || {}).find(key => normalizeEmail(userRecords[key]?.email) === normalized) || null;
+  let resolvedUid = recordKey;
+
+  if (!resolvedUid) {
+    resolvedUid = await resolveUidByEmail(email);
+  }
+
+  let emailRegistered = !!resolvedUid;
+
+  if (!emailRegistered) {
+    try {
+      const methods = await auth.fetchSignInMethodsForEmail(email);
+      emailRegistered = Array.isArray(methods) && methods.length > 0;
+    } catch (error) {
+      console.error('이메일 확인 오류:', error);
+      if (error.code === 'auth/invalid-email') {
+        alert('올바른 이메일 형식을 입력해주세요.');
+      } else {
+        alert('이메일 확인 중 오류가 발생했습니다: ' + error.message);
+      }
       return;
     }
-  } catch (error) {
-    console.error('이메일 확인 오류:', error);
-    if (error.code === 'auth/invalid-email') {
-      alert('올바른 이메일 형식을 입력해주세요.');
-    } else {
-      alert('이메일 확인 중 오류가 발생했습니다: ' + error.message);
-    }
+  }
+
+  if (!emailRegistered) {
+    alert('Firebase Authentication에 등록된 이메일만 추가할 수 있습니다.');
     return;
   }
 
-  const normalized = normalizeEmail(email);
-  let recordKey = Object.keys(userRecords || {}).find(key => normalizeEmail(userRecords[key]?.email) === normalized) || null;
-
   if (!recordKey) {
-    const resolvedUid = await resolveUidByEmail(email);
     recordKey = resolvedUid || db.ref(paths.users).push().key;
   }
 

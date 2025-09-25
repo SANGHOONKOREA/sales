@@ -183,7 +183,8 @@ button {
 }
 
 .primary-btn,
-.secondary-btn {
+.secondary-btn,
+.danger-btn {
   padding: 0.75rem 1.5rem;
   border: none;
   border-radius: var(--radius);
@@ -197,6 +198,11 @@ button {
 .primary-btn {
   background-color: var(--primary-color);
   color: white;
+}
+
+.danger-btn {
+  background-color: var(--danger-color);
+  color: #fff;
 }
 
 .primary-btn:hover {
@@ -213,6 +219,12 @@ button {
 
 .secondary-btn:hover {
   background-color: #e9ecef;
+}
+
+.danger-btn:hover {
+  background-color: #c82333;
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
 }
 
 .btn-icon,
@@ -1912,15 +1924,15 @@ th[data-field="modifiedDate"], td[data-field="modifiedDate"] { min-width: 120px;
 }
 
 /* 사용자 관리 모달 */
-#userModal .modal-content {
-  width: 500px;
-  max-width: 90%;
-  padding: 30px;
+#userModal .modal-content.user-modal {
+  width: 720px;
+  max-width: 95%;
+  padding: 32px;
 }
 
 #userModal h2,
 #userModal h3 {
-  margin: 0 0 15px;
+  margin: 0 0 16px;
   color: var(--primary-color);
   font-weight: 600;
 }
@@ -1931,11 +1943,11 @@ th[data-field="modifiedDate"], td[data-field="modifiedDate"] { min-width: 120px;
 
 #userModal h3 {
   font-size: 1.2em;
-  margin-top: 25px;
+  margin-top: 24px;
 }
 
 #userModal .form-group {
-  margin-bottom: 15px;
+  margin-bottom: 16px;
 }
 
 #userModal .form-group label {
@@ -1947,16 +1959,19 @@ th[data-field="modifiedDate"], td[data-field="modifiedDate"] { min-width: 120px;
 
 #userModal input[type="text"],
 #userModal input[type="password"],
-#userModal input[type="email"] {
+#userModal input[type="email"],
+#userModal select {
   width: 100%;
   padding: 10px 12px;
-  border: 2px solid #e1e5e9;
+  border: 1px solid #dce1e6;
   border-radius: 6px;
-  font-size: 1em;
-  transition: all 0.3s ease;
+  font-size: 0.95em;
+  transition: all 0.2s ease;
+  background-color: #fff;
 }
 
-#userModal input:focus {
+#userModal input:focus,
+#userModal select:focus {
   border-color: var(--primary-color);
   box-shadow: 0 0 0 3px rgba(49, 91, 138, 0.1);
   outline: none;
@@ -1964,73 +1979,105 @@ th[data-field="modifiedDate"], td[data-field="modifiedDate"] { min-width: 120px;
 
 #userModal .btn-row {
   display: flex;
-  gap: 10px;
+  gap: 12px;
   justify-content: flex-end;
-  margin-top: 20px;
+  margin-top: 18px;
 }
 
 #userModal .btn-row button {
-  background: var(--primary-color);
-  color: #fff;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
+  min-width: 120px;
+}
+
+.user-modal-guide {
+  margin-top: -4px;
+  margin-bottom: 18px;
+  color: var(--text-muted);
   font-size: 0.9em;
-  padding: 10px 18px;
-  font-weight: 600;
-  transition: all 0.3s ease;
 }
 
-#userModal .btn-row button:hover {
-  background: #2b4f7a;
-  transform: translateY(-2px);
-}
-
-#deleteSelectedUsersBtn {
-  background: var(--danger-color) !important;
-}
-
-#deleteSelectedUsersBtn:hover {
-  background: #c82333 !important;
-}
-
-#userList {
-  border: 2px solid #e9ecef;
-  border-radius: 6px;
-  padding: 12px;
-  margin-bottom: 15px;
-  max-height: 200px;
+.user-table-wrapper {
+  border: 1px solid #e1e5e9;
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 18px;
+  max-height: 320px;
   overflow-y: auto;
-  background: #f8f9fa;
-}
-
-#userList::-webkit-scrollbar {
-  width: 6px;
-}
-
-#userList::-webkit-scrollbar-track {
-  background: #e9ecef;
-  border-radius: 3px;
-}
-
-#userList::-webkit-scrollbar-thumb {
-  background: #6c757d;
-  border-radius: 3px;
-}
-
-#userList > div {
-  padding: 8px;
-  margin-bottom: 6px;
   background: #fff;
-  border-radius: 4px;
-  border: 1px solid #dee2e6;
-  display: flex;
-  align-items: center;
-  gap: 10px;
 }
 
-#userList > div:hover {
+.user-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95em;
+}
+
+.user-table thead {
+  background: #f5f7fa;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.user-table th,
+.user-table td {
+  padding: 12px 14px;
+  border-bottom: 1px solid #e8ecf0;
+  text-align: left;
+}
+
+.user-table th:first-child,
+.user-table td:first-child {
+  width: 60px;
+  text-align: center;
+}
+
+.user-table input,
+.user-table select {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid #dce1e6;
+  border-radius: 6px;
+  font-size: 0.9em;
+}
+
+.user-table input:focus,
+.user-table select:focus {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(49, 91, 138, 0.12);
+  outline: none;
+}
+
+.user-role-badge {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.75em;
   background: #e9ecef;
+  color: var(--text-color);
+  font-weight: 600;
+}
+
+.user-role-badge.primary {
+  background: rgba(49, 91, 138, 0.15);
+  color: var(--primary-color);
+}
+
+.user-role-badge.info {
+  background: rgba(23, 162, 184, 0.15);
+  color: var(--info-color);
+}
+
+.user-table-empty {
+  text-align: center;
+  padding: 24px 0;
+  font-size: 0.95em;
+  color: var(--text-muted);
+}
+
+.user-table-actions {
+  justify-content: space-between !important;
+  margin-top: 12px;
 }
 
 /* 내용 보기 모달 */

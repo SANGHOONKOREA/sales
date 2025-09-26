@@ -4835,7 +4835,9 @@ async function addCommunication() {
     document.getElementById('commContent').value = '';
 
     // 이력 다시 로드
-    communications.push(newComm);
+    if (!communications.find(c => c.id === newComm.id)) {
+      communications.push(newComm);
+    }
     loadCommCustomerList();
     loadCustomerComms(selectedCustomerId);
 

@@ -2620,28 +2620,45 @@ function downloadExcel() {
   
   setTimeout(() => {
     try {
-      const arr = salesData.map(d => ({
-        'NO.': d.no,
-        '지역': d.region,
-        '등록일': d.registDate,
-        '제품': d.product,
-        '프로젝트명': d.projectName,
-        '유형': d.type,
-        '입찰금액': d.bidAmount,
-        '통화': d.currency,
-        '고객사': d.customer,
-        '담당자': d.manager,
-        'DATE': d.date,
-        '진행현황': d.progress,
-        'REMARK': d.remark,
-        '현황': d.status,
-        '수정일': d.modifiedDate
-      }));
-      
-      const ws = XLSX.utils.json_to_sheet(arr);
+      const headers = [
+        'NO.',
+        '지역',
+        '등록일',
+        '제품',
+        '프로젝트명',
+        '유형',
+        '입찰금액',
+        '통화',
+        '고객사',
+        '담당자',
+        'DATE',
+        '진행현황',
+        'REMARK',
+        '현황',
+        '수정일'
+      ];
+      const rows = salesData.map(d => [
+        d.no || '',
+        d.region || '',
+        d.registDate || '',
+        d.product || '',
+        d.projectName || '',
+        d.type || '',
+        d.bidAmount || '',
+        d.currency || '',
+        d.customer || '',
+        d.manager || '',
+        d.date || '',
+        d.progress || '',
+        d.remark || '',
+        d.status || '',
+        d.modifiedDate || ''
+      ]);
+
+      const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Sales_Data");
-      
+
       XLSX.writeFile(wb, "Sales_Data.xlsx");
     } catch (err) {
       console.error("엑셀 다운로드 오류:", err);

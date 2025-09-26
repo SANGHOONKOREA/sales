@@ -4771,7 +4771,10 @@ function loadCustomerComms(customerId) {
         <div class="timeline-footer">
           <span>${authorName}</span>
           <div class="timeline-actions">
-            <button class="timeline-action-btn" onclick="deleteCommunication('${comm.id}')">삭제</button>
+            <button type="button" class="timeline-action-btn" onclick="deleteCommunication('${comm.id}')">
+              <i class="fas fa-trash-alt"></i>
+              <span>삭제</span>
+            </button>
           </div>
         </div>
       </div>

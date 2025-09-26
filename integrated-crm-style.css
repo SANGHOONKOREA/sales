@@ -749,28 +749,25 @@ button {
   gap: 0.75rem;
 }
 
-.customer-filter-bar {
-  display: flex;
-  align-items: flex-end;
-  flex-wrap: wrap;
-  gap: 0.75rem;
+.customer-filters {
+  width: 100%;
+  margin-bottom: 1.5rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  background: #fafbfc;
 }
 
-.filter-group {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
+.customer-filters .filter-group {
   min-width: 160px;
 }
 
-.filter-group label {
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--text-muted);
+.customer-filters .search-group {
+  flex: 1;
+  min-width: 220px;
 }
 
-.filter-group input {
-  min-height: 38px;
+.customer-filters .search-group .search-box {
+  width: 100%;
 }
 
 .search-box {
@@ -787,7 +784,8 @@ button {
 
 .search-box input {
   padding-left: 2.5rem;
-  min-width: 220px;
+  width: 100%;
+  min-width: 0;
 }
 
 /* 데이터 테이블 */
@@ -1787,12 +1785,21 @@ th[data-field="modifiedDate"], td[data-field="modifiedDate"] { min-width: 120px;
   color: var(--danger-color);
   cursor: pointer;
   font-size: 0.75rem;
-  padding: 0;
-  text-decoration: underline;
+  padding: 4px 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border-radius: 4px;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 .timeline-action-btn:hover {
-  color: #a94442;
+  color: #fff;
+  background-color: var(--danger-color);
+}
+
+.timeline-action-btn i {
+  font-size: 0.75rem;
 }
 
 .remark-history-list {

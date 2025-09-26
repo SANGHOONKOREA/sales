@@ -291,34 +291,37 @@
               <i class="fas fa-file-export"></i> 내보내기
             </button>
           </div>
-          <div class="customer-filter-bar">
+        </div>
+        <div class="filters customer-filters">
+          <div class="filter-group search-group">
+            <label for="customerSearch">검색</label>
             <div class="search-box">
               <i class="fas fa-search"></i>
               <input type="text" id="customerSearch" placeholder="고객 검색..." oninput="applyCustomerFilters()">
             </div>
-            <div class="filter-group">
-              <label for="companyFilter">회사명</label>
-              <input type="text" id="companyFilter" list="companyOptions" placeholder="회사명 선택 또는 입력" oninput="applyCustomerFilters()">
-              <datalist id="companyOptions"></datalist>
-            </div>
-            <div class="filter-group">
-              <label for="managerFilter">담당자</label>
-              <input type="text" id="managerFilter" list="managerOptions" placeholder="담당자 선택 또는 입력" oninput="applyCustomerFilters()">
-              <datalist id="managerOptions"></datalist>
-            </div>
-            <div class="filter-group">
-              <label for="mainCustomerFilter">주요고객</label>
-              <input type="text" id="mainCustomerFilter" list="mainCustomerOptions" placeholder="Y / N" oninput="applyCustomerFilters()">
-              <datalist id="mainCustomerOptions">
-                <option value="Y"></option>
-                <option value="N"></option>
-              </datalist>
-            </div>
-            <div class="filter-group">
-              <label for="emailFilter">이메일</label>
-              <input type="text" id="emailFilter" list="emailOptions" placeholder="이메일 선택 또는 입력" oninput="applyCustomerFilters()">
-              <datalist id="emailOptions"></datalist>
-            </div>
+          </div>
+          <div class="filter-group">
+            <label for="companyFilter">회사명</label>
+            <input type="text" id="companyFilter" list="companyOptions" placeholder="회사명 선택 또는 입력" oninput="applyCustomerFilters()">
+            <datalist id="companyOptions"></datalist>
+          </div>
+          <div class="filter-group">
+            <label for="managerFilter">담당자</label>
+            <input type="text" id="managerFilter" list="managerOptions" placeholder="담당자 선택 또는 입력" oninput="applyCustomerFilters()">
+            <datalist id="managerOptions"></datalist>
+          </div>
+          <div class="filter-group">
+            <label for="mainCustomerFilter">주요고객</label>
+            <input type="text" id="mainCustomerFilter" list="mainCustomerOptions" placeholder="Y / N" oninput="applyCustomerFilters()">
+            <datalist id="mainCustomerOptions">
+              <option value="Y"></option>
+              <option value="N"></option>
+            </datalist>
+          </div>
+          <div class="filter-group">
+            <label for="emailFilter">이메일</label>
+            <input type="text" id="emailFilter" list="emailOptions" placeholder="이메일 선택 또는 입력" oninput="applyCustomerFilters()">
+            <datalist id="emailOptions"></datalist>
           </div>
         </div>
 

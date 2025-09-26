@@ -43,7 +43,7 @@ body {
   line-height: 1.5;
   color: var(--text-color);
   background-color: var(--background-color);
-  overflow: hidden;
+  overflow: auto;
 }
 
 /* 유틸리티 클래스 */
@@ -277,7 +277,12 @@ button {
 /* 메인 레이아웃 */
 .main-layout {
   display: flex;
+  width: 100vw;
   height: 100vh;
+  margin: 0 auto;
+  max-width: 100%;
+  max-height: 100vh;
+  overflow: hidden;
 }
 
 /* 사이드바 */
@@ -431,7 +436,7 @@ button {
   flex: 1;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow: auto;
   background-color: var(--background-color);
 }
 
@@ -519,6 +524,14 @@ button {
   font-weight: 600;
 }
 
+#notificationBadge {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+}
+
 .user-menu {
   display: flex;
   align-items: center;
@@ -551,6 +564,12 @@ button {
   flex: 1;
   overflow-y: auto;
   padding: 1.5rem;
+}
+
+.content-area .view-content {
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
 }
 
 .view-content {
@@ -730,10 +749,28 @@ button {
   gap: 0.75rem;
 }
 
-.view-filters {
+.customer-filter-bar {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
+  flex-wrap: wrap;
   gap: 0.75rem;
+}
+
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 160px;
+}
+
+.filter-group label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.filter-group input {
+  min-height: 38px;
 }
 
 .search-box {
@@ -750,7 +787,7 @@ button {
 
 .search-box input {
   padding-left: 2.5rem;
-  width: 250px;
+  min-width: 220px;
 }
 
 /* 데이터 테이블 */
@@ -758,7 +795,7 @@ button {
   background-color: white;
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
-  overflow: hidden;
+  overflow: auto;
 }
 
 .data-table {
@@ -1019,7 +1056,7 @@ button {
   height: calc(100vh - 450px);
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow: auto;
 }
 
 .table-wrapper {
@@ -1478,18 +1515,27 @@ th[data-field="modifiedDate"], td[data-field="modifiedDate"] { min-width: 120px;
 .comm-header {
   padding: 1.5rem;
   border-bottom: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
 }
 
-.comm-header h3 {
+.comm-header-text h3 {
   font-size: 1.125rem;
   margin: 0 0 0.5rem;
   color: var(--text-color);
 }
 
-.comm-header p {
+.comm-header-text p {
   font-size: 0.875rem;
   color: var(--text-muted);
   margin: 0;
+}
+
+.comm-header .badge {
+  position: static;
+  margin-left: 0.5rem;
 }
 
 .comm-timeline {
@@ -1552,11 +1598,6 @@ th[data-field="modifiedDate"], td[data-field="modifiedDate"] { min-width: 120px;
   margin-bottom: 0.5rem;
 }
 
-.timeline-footer {
-  font-size: 0.75rem;
-  color: var(--text-muted);
-}
-
 .comm-input {
   padding: 1.5rem;
   border-top: 1px solid var(--border-color);
@@ -1611,6 +1652,10 @@ th[data-field="modifiedDate"], td[data-field="modifiedDate"] { min-width: 120px;
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
   min-height: 600px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow: auto;
 }
 
 /* FullCalendar 커스터마이징 */
@@ -1648,38 +1693,24 @@ th[data-field="modifiedDate"], td[data-field="modifiedDate"] { min-width: 120px;
 }
 
 /* 분석 뷰 */
-.analytics-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1.5rem;
-}
-
-.analytics-header select {
-  width: 150px;
-}
-
-.analytics-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
-  gap: 1.5rem;
-}
-
-.analytics-card {
+.analytics-placeholder {
   background-color: white;
-  padding: 1.5rem;
+  padding: 3rem 1.5rem;
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  font-size: 1.25rem;
+  color: var(--text-muted);
+  text-align: center;
 }
 
-.analytics-card h3 {
-  font-size: 1.125rem;
-  margin-bottom: 1rem;
-  color: var(--text-color);
-}
-
-.analytics-card canvas {
-  max-height: 300px;
+.analytics-placeholder i {
+  font-size: 2.5rem;
+  color: var(--primary-color);
 }
 
 /* 설정 뷰 */
@@ -1688,6 +1719,107 @@ th[data-field="modifiedDate"], td[data-field="modifiedDate"] { min-width: 120px;
   gap: 0.5rem;
   margin-bottom: 2rem;
   border-bottom: 2px solid var(--border-color);
+}
+
+.data-table th.col-no,
+.data-table td.col-no {
+  width: 80px;
+  min-width: 80px;
+  text-align: center;
+}
+
+.data-table td.main-customer-cell {
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.main-customer-cell .badge {
+  position: static;
+  margin: 0;
+}
+
+.customer-info .badge {
+  position: static;
+}
+
+.history-btn {
+  padding: 0.35rem 0.75rem;
+  background-color: var(--light-color);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  font-size: 0.75rem;
+  color: var(--text-color);
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.history-btn:hover {
+  background-color: var(--primary-light);
+  color: var(--primary-color);
+}
+
+.field-hint {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.timeline-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.timeline-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.timeline-action-btn {
+  background: none;
+  border: none;
+  color: var(--danger-color);
+  cursor: pointer;
+  font-size: 0.75rem;
+  padding: 0;
+  text-decoration: underline;
+}
+
+.timeline-action-btn:hover {
+  color: #a94442;
+}
+
+.remark-history-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.remark-history-item {
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.remark-history-item:last-child {
+  border-bottom: none;
+}
+
+.remark-history-meta {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-bottom: 0.35rem;
+}
+
+.deal-owner {
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
 }
 
 .settings-admin-actions {
@@ -1829,6 +1961,13 @@ th[data-field="modifiedDate"], td[data-field="modifiedDate"] { min-width: 120px;
   overflow-y: auto;
 }
 
+.modal-description {
+  margin-top: -0.5rem;
+  margin-bottom: 1.25rem;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
 .modal-content.modal-lg {
   max-width: 800px;
 }
@@ -1936,44 +2075,49 @@ th[data-field="modifiedDate"], td[data-field="modifiedDate"] { min-width: 120px;
   transform: translateX(4px);
 }
 
-/* 사용자 관리 모달 */
-#userModal .modal-content.user-modal {
-  width: 720px;
-  max-width: 95%;
-  padding: 32px;
+/* 사용자 관리 */
+.user-management-page {
+  background: #fff;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
 }
 
-#userModal h2,
-#userModal h3 {
-  margin: 0 0 16px;
+.user-management-header h2 {
+  margin-bottom: 0.5rem;
   color: var(--primary-color);
-  font-weight: 600;
+  font-size: 1.4rem;
 }
 
-#userModal h2 {
-  font-size: 1.4em;
+.user-management-header p {
+  color: var(--text-muted);
+  font-size: 0.95rem;
 }
 
-#userModal h3 {
-  font-size: 1.2em;
-  margin-top: 24px;
+.user-management-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
 }
 
-#userModal .form-group {
-  margin-bottom: 16px;
+#userManagementView .form-group {
+  margin-bottom: 0;
 }
 
-#userModal .form-group label {
+#userManagementView .form-group label {
   display: block;
   font-weight: 600;
   margin-bottom: 6px;
   color: #333;
 }
 
-#userModal input[type="text"],
-#userModal input[type="password"],
-#userModal input[type="email"],
-#userModal select {
+#userManagementView input[type="text"],
+#userManagementView input[type="password"],
+#userManagementView input[type="email"],
+#userManagementView select {
   width: 100%;
   padding: 10px 12px;
   border: 1px solid #dce1e6;
@@ -1983,22 +2127,26 @@ th[data-field="modifiedDate"], td[data-field="modifiedDate"] { min-width: 120px;
   background-color: #fff;
 }
 
-#userModal input:focus,
-#userModal select:focus {
+#userManagementView input:focus,
+#userManagementView select:focus {
   border-color: var(--primary-color);
   box-shadow: 0 0 0 3px rgba(49, 91, 138, 0.1);
   outline: none;
 }
 
-#userModal .btn-row {
-  display: flex;
-  gap: 12px;
-  justify-content: flex-end;
-  margin-top: 18px;
+.user-management-divider {
+  height: 1px;
+  background: #e9ecef;
 }
 
-#userModal .btn-row button {
-  min-width: 120px;
+.user-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.user-form-actions {
+  justify-content: flex-end;
 }
 
 .user-modal-guide {
@@ -2610,6 +2758,48 @@ canvas {
   height: calc(100% - 70px);
 }
 
+.notification-item {
+  display: flex;
+  gap: 0.75rem;
+  padding: 0.75rem 0.5rem;
+  border-bottom: 1px solid var(--border-color);
+  animation: fadeInUp 0.2s ease;
+}
+
+.notification-item:last-child {
+  border-bottom: none;
+}
+
+.notification-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--highlight-color);
+  color: var(--primary-color);
+  flex-shrink: 0;
+}
+
+.notification-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.notification-message {
+  font-size: 0.9rem;
+  color: var(--text-color);
+  line-height: 1.4;
+}
+
+.notification-time {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
 .no-data {
   text-align: center;
   color: var(--text-muted);
@@ -2650,13 +2840,17 @@ canvas {
   .dashboard-grid {
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   }
-  
+
   .dashboard-charts {
     grid-template-columns: 1fr;
   }
-  
+
   .analytics-grid {
     grid-template-columns: 1fr;
+  }
+
+  .content-area .view-content {
+    max-width: 100%;
   }
 }
 
@@ -2674,6 +2868,10 @@ canvas {
   
   .main-content {
     margin-left: 0;
+  }
+
+  .content-area .view-content {
+    max-width: 100%;
   }
   
   .view-header {

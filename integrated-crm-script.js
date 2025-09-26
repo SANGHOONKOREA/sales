@@ -44,6 +44,8 @@ let calendar = null;
 let charts = {};
 let chartInstances = {};
 let realtimeListenersAttached = false;
+let calendarResizeObserver = null;
+let calendarResizeHandler = null;
 
 // 정렬 및 페이지네이션
 let sortField = '';
@@ -177,10 +179,15 @@ function initializeEventListeners() {
   document.getElementById('customerImportFullBtn')?.addEventListener('click', () => startCustomerImport('full'));
   document.getElementById('customerImportPartialBtn')?.addEventListener('click', () => startCustomerImport('partial'));
   document.getElementById('customerImportCancelBtn')?.addEventListener('click', closeCustomerImportModal);
-  
+
   // 열 리사이징
   document.addEventListener('mousedown', handleMouseDown);
-  
+
+  // 캘린더 필터
+  document.querySelectorAll('.calendar-filters input[type="checkbox"]').forEach((checkbox) => {
+    checkbox.addEventListener('change', handleCalendarFilterChange);
+  });
+
   // ESC 키로 모달 닫기
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
@@ -4839,33 +4846,142 @@ async function addCommunication() {
 }
 
 // 캘린더 기능
+function handleCalendarFilterChange() {
+  if (calendar) {
+    calendar.refetchEvents();
+    calendar.updateSize();
+  }
+}
+
+function getCalendarFilterCheckboxes() {
+  return Array.from(document.querySelectorAll('.calendar-filters input[type="checkbox"][data-event-type]'));
+}
+
+function getCalendarFilterState() {
+  const checkboxes = getCalendarFilterCheckboxes();
+  if (!checkboxes.length) {
+    return { active: new Set(), available: new Set() };
+  }
+
+  const active = new Set();
+  const available = new Set();
+
+  checkboxes.forEach((checkbox) => {
+    const type = checkbox.dataset.eventType;
+    if (!type) return;
+    available.add(type);
+    if (checkbox.checked) {
+      active.add(type);
+    }
+  });
+
+  return { active, available };
+}
+
+function shouldDisplayCalendarEvent(event, activeTypes, availableTypes) {
+  if (!event) return false;
+
+  const eventType = event.type || 'other';
+
+  if (!availableTypes || availableTypes.size === 0) {
+    return true;
+  }
+
+  if (!availableTypes.has(eventType)) {
+    return true;
+  }
+
+  if (!activeTypes || activeTypes.size === 0) {
+    return false;
+  }
+
+  return activeTypes.has(eventType);
+}
+
+function formatCalendarEvent(event) {
+  const eventType = event?.type || 'other';
+  return {
+    id: event.id,
+    title: getEventCalendarTitle(event),
+    start: event.start,
+    end: event.end,
+    allDay: Boolean(event.allDay),
+    color: getEventColor(eventType),
+    extendedProps: {
+      type: eventType,
+      customerId: event.customerId,
+      customCustomer: event.customCustomer || event.customerName || '',
+      description: event.description,
+      author: formatUserDisplay(event.createdBy || event.modifiedBy || '')
+    }
+  };
+}
+
+function buildCalendarEventSource() {
+  const { active, available } = getCalendarFilterState();
+  return events
+    .filter(event => shouldDisplayCalendarEvent(event, active, available))
+    .map(event => formatCalendarEvent(event));
+}
+
+function detachCalendarResizeHandler() {
+  if (calendarResizeObserver) {
+    calendarResizeObserver.disconnect();
+    calendarResizeObserver = null;
+  }
+
+  if (calendarResizeHandler) {
+    window.removeEventListener('resize', calendarResizeHandler);
+    calendarResizeHandler = null;
+  }
+}
+
+function attachCalendarResizeHandler(element) {
+  if (!element) return;
+
+  if (typeof ResizeObserver !== 'undefined') {
+    detachCalendarResizeHandler();
+    calendarResizeObserver = new ResizeObserver(() => {
+      if (calendar) {
+        calendar.updateSize();
+      }
+    });
+    calendarResizeObserver.observe(element);
+  } else if (!calendarResizeHandler) {
+    calendarResizeHandler = () => {
+      if (calendar) {
+        calendar.updateSize();
+      }
+    };
+    window.addEventListener('resize', calendarResizeHandler);
+  }
+}
+
 function initializeCalendar() {
+  const calendarEl = document.getElementById('calendar');
+  if (!calendarEl) return;
+
+  detachCalendarResizeHandler();
+
   if (calendar) {
     calendar.destroy();
+    calendar = null;
   }
-  
-  const calendarEl = document.getElementById('calendar');
+
   calendar = new FullCalendar.Calendar(calendarEl, {
     initialView: 'dayGridMonth',
     locale: 'ko',
+    height: 'auto',
+    contentHeight: 'auto',
+    expandRows: true,
     headerToolbar: {
       left: 'prev,next today',
       center: 'title',
       right: 'dayGridMonth,timeGridWeek,timeGridDay'
     },
-    events: events.map(event => ({
-      id: event.id,
-      title: getEventCalendarTitle(event),
-      start: event.start,
-      end: event.end,
-      color: getEventColor(event.type),
-      extendedProps: {
-        type: event.type,
-        customerId: event.customerId,
-        description: event.description,
-        author: formatUserDisplay(event.createdBy || event.modifiedBy || '')
-      }
-    })),
+    events: (_, successCallback) => {
+      successCallback(buildCalendarEventSource());
+    },
     eventClick: function(info) {
       viewEvent(info.event.id);
     },
@@ -4873,8 +4989,10 @@ function initializeCalendar() {
       openEventModal(null, info.dateStr);
     }
   });
-  
+
   calendar.render();
+  calendar.updateSize();
+  attachCalendarResizeHandler(calendarEl);
 }
 
 // 일정 모달

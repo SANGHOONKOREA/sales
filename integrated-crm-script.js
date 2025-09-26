@@ -1,4 +1,4 @@
-// 통합 CRM Pro - 전문 고객 관계 및 영업 관리 시스템
+// S&SYS SALES PORTAL - 전문 고객 관계 및 영업 관리 시스템
 // Firebase 초기화
 const firebaseConfig = {
   apiKey: "AIzaSyDylEzWAPbo6kfMYwxjjSHXT4bnb1bJWzg",
@@ -6115,7 +6115,7 @@ function updatePagination() {
 }
 
 // 초기화 완료 로그
-console.log('통합 CRM Pro 시스템 초기화 완료');
+console.log('S&SYS SALES PORTAL 시스템 초기화 완료');
 console.log('버전: 3.0.0');
 console.log('Firebase 프로젝트:', firebaseConfig.projectId);
 console.log('통합 기능: CRM + 영업 안건 관리');

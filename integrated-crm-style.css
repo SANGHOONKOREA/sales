@@ -1,4 +1,4 @@
-/* 통합 CRM Pro - 전문 고객 관계 및 영업 관리 시스템 스타일 */
+/* S&SYS SALES PORTAL - 전문 고객 관계 및 영업 관리 시스템 스타일 */
 :root {
   /* 색상 변수 */
   --primary-color: #315b8a;
@@ -318,6 +318,18 @@ button {
 .sidebar-header {
   padding: 1.5rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.sidebar-logo {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  object-fit: contain;
+  background: #fff;
+  padding: 4px;
 }
 
 .sidebar-header h3 {
@@ -332,6 +344,11 @@ button {
 
 .sidebar.collapsed .sidebar-header h3 span {
   display: none;
+}
+
+.sidebar.collapsed .sidebar-logo {
+  width: 40px;
+  height: 40px;
 }
 
 /* 네비게이션 메뉴 */
